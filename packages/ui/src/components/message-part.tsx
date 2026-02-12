@@ -41,6 +41,7 @@ import { Icon } from "./icon"
 import { Checkbox } from "./checkbox"
 import { DiffChanges } from "./diff-changes"
 import { Markdown } from "./markdown"
+import { Tabs } from "./tabs"
 import { ImagePreview } from "./image-preview"
 import { findLast } from "@opencode-ai/util/array"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/util/path"
@@ -260,6 +261,11 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
       return {
         icon: "bubble-5",
         title: i18n.t("ui.tool.questions"),
+      }
+    case "kudata-mcp_run_select_query":
+      return {
+        icon: "mcp",
+        title: "Run SQL Query",
       }
     default:
       return {
@@ -1331,6 +1337,61 @@ ToolRegistry.register({
             </For>
           </div>
         </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_run_select_query",
+  render(props) {
+    const codeComponent = useCodeComponent()
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: props.input.insanct,
+        }}
+      >
+        <div data-component="mcp-tool-content">
+          <Tabs defaultValue={props.output ? "output" : "input"}>
+            <Tabs.List>
+              <Tabs.Trigger value="input">Input SQL</Tabs.Trigger>
+              <Tabs.Trigger value="output">Output Results</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="input">
+              <div data-slot="mcp-sql-tabs-content">
+                <Dynamic
+                  component={codeComponent}
+                  file={{
+                    name: "input.sql",
+                    contents: props.input.query ?? "",
+                    cacheKey: checksum(props.input.query ?? ""),
+                  }}
+                  overflow="scroll"
+                />
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="output">
+              <div data-slot="mcp-sql-tabs-content">
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">No results yet.</div>}>
+                  <Dynamic
+                    component={codeComponent}
+                    file={{
+                      name: "output.json",
+                      contents: props.output!,
+                      cacheKey: checksum(props.output!),
+                    }}
+                    overflow="scroll"
+                  />
+                </Show>
+              </div>
+            </Tabs.Content>
+          </Tabs>
+        </div>
       </BasicTool>
     )
   },
