@@ -11,6 +11,7 @@ import {
   type JSX,
 } from "solid-js"
 import stripAnsi from "strip-ansi"
+import * as echarts from "echarts"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -266,6 +267,12 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
       return {
         icon: "mcp",
         title: "Run SQL Query",
+      }
+    case "kudata-mcp_render_chart":
+      return {
+        icon: "chart",
+        title: "Chart",
+        subtitle: input.title,
       }
     default:
       return {
@@ -1392,6 +1399,69 @@ ToolRegistry.register({
             </Tabs.Content>
           </Tabs>
         </div>
+      </BasicTool>
+    )
+  },
+})
+
+function EChartsRenderer(props: { data: string }) {
+  let containerRef: HTMLDivElement | undefined
+  let chartInstance: echarts.ECharts | undefined
+
+  const chartData = createMemo(() => {
+    try {
+      return JSON.parse(props.data)
+    } catch {
+      return null
+    }
+  })
+
+  createEffect(() => {
+    const data = chartData()
+    if (!containerRef || !data) return
+
+    if (chartInstance) chartInstance.dispose()
+    chartInstance = echarts.init(containerRef)
+
+    const option: Record<string, any> = {}
+
+    option.tooltip = {}
+
+    option.xAxis = { type: "category", data: data.xAxis || [] }
+    option.yAxis = { type: "value" }
+    option.series = (data.series || []).map((s: any) => ({
+      ...s,
+      type: data.type || "bar",
+    }))
+
+    chartInstance.setOption(option)
+
+    onCleanup(() => chartInstance?.dispose())
+  })
+
+  return (
+    <Show when={chartData()} fallback={<div>Invalid chart data</div>}>
+      <div ref={containerRef} style={{ width: "100%", height: "350px" }} />
+    </Show>
+  )
+}
+
+ToolRegistry.register({
+  name: "kudata-mcp_render_chart",
+  render(props) {
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: info().subtitle || "",
+        }}
+      >
+        <Show when={props.output} fallback={<div style={{ padding: "12px", color: "var(--color-text-muted)" }}>Loading chart...</div>}>
+          {(output) => <EChartsRenderer data={output()} />}
+        </Show>
       </BasicTool>
     )
   },
