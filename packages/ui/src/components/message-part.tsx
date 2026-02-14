@@ -1476,7 +1476,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "skill",
   render(props) {
-    const codeComponent = useCodeComponent()
     const info = createMemo(() => getToolInfo(props.tool, props.input))
     return (
       <BasicTool
@@ -1487,34 +1486,13 @@ ToolRegistry.register({
           subtitle: info().subtitle || "",
         }}
       >
-        <div data-component="mcp-tool-content">
-          <Tabs defaultValue={props.output ? "output" : "input"}>
-            <Tabs.List>
-              <Tabs.Trigger value="input">Input</Tabs.Trigger>
-              <Tabs.Trigger value="output">Output</Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="input">
-              <div data-slot="mcp-sql-tabs-content">
-                <Dynamic
-                  component={codeComponent}
-                  file={{
-                    name: "input.json",
-                    contents: JSON.stringify(props.input, null, 2),
-                    cacheKey: checksum(JSON.stringify(props.input)),
-                  }}
-                  overflow="scroll"
-                />
-              </div>
-            </Tabs.Content>
-            <Tabs.Content value="output">
-              <div data-slot="mcp-sql-tabs-content">
-                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">No results yet.</div>}>
-                  <Markdown text={props.output!} />
-                </Show>
-              </div>
-            </Tabs.Content>
-          </Tabs>
-        </div>
+        <Show when={props.output} fallback={<div data-slot="mcp-tool-loading">Loading skill...</div>}>
+          {(output) => (
+            <div data-component="tool-output" data-scrollable data-type="skill">
+              {output()}
+            </div>
+          )}
+        </Show>
       </BasicTool>
     )
   },

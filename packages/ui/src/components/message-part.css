@@ -236,6 +236,19 @@
       overflow: visible;
     }
   }
+
+  &[data-type="skill"] {
+    white-space: pre-wrap;
+    padding: 12px;
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
+[data-slot="mcp-tool-loading"] {
+  padding: 12px;
+  color: var(--text-weak);
 }
 
 [data-component="edit-trigger"],
@@ -272,9 +285,6 @@
     text-transform: capitalize;
   }
 
-  [data-slot="message-part-title-filename"] {
-    /* No text-transform - preserve original filename casing */
-  }
 
   [data-slot="message-part-path"] {
     display: flex;
