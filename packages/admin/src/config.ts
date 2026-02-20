@@ -14,4 +14,9 @@ export const Config = {
     password: process.env.MYSQL_PASSWORD ?? "password",
     database: process.env.MYSQL_DATABASE ?? "admin_db",
   },
+  /** Storage configuration */
+  skills: {
+    storageDir: process.env.SKILLS_STORAGE_DIR ?? join(process.cwd(), "storage", "skills"),
+    syncScript: process.env.SKILL_SYNC_SCRIPT ?? join(process.cwd(), "..", "..", "scripts", "skill_sync.sh"),
+  }
 }

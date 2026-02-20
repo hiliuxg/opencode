@@ -48,6 +48,14 @@ const SessionRoute = () => (
   </SessionProviders>
 )
 
+const Skills = lazy(() => import("@/pages/skills"))
+
+const SkillsRoute = () => (
+  <Suspense fallback={<Loading />}>
+    <Skills />
+  </Suspense>
+)
+
 const SessionIndexRoute = () => <Navigate href="session" />
 
 function UiI18nBridge(props: ParentProps) {
@@ -188,6 +196,7 @@ export function AppInterface(props: { defaultUrl?: string; children?: JSX.Elemen
               <Route path="/:dir" component={DirectoryLayout}>
                 <Route path="/" component={SessionIndexRoute} />
                 <Route path="/session/:id?" component={SessionRoute} />
+                <Route path="/skills" component={SkillsRoute} />
               </Route>
             </Router>
           </GlobalSyncProvider>

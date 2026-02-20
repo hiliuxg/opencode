@@ -5,7 +5,7 @@
 
 const DEFAULT_ADMIN_URL = "http://localhost:8787"
 
-function getAdminUrl(): string {
+export function getAdminUrl(): string {
     try {
         return import.meta.env.VITE_ADMIN_API_URL || DEFAULT_ADMIN_URL
     } catch {
@@ -148,3 +148,30 @@ export async function getExecutions(params?: {
     return res.items || []
 }
 
+export interface Skill {
+    id: number
+    name: string
+    catalog: string
+    description: string
+    userId: number
+    stars: number
+    createdAt: string
+    updatedAt: string
+    latestVersion?: string
+}
+
+export async function getSkills(params?: {
+    catalog?: string
+    name?: string
+}): Promise<Skill[]> {
+    const sp = new URLSearchParams()
+    if (params?.catalog) sp.set("catalog", params.catalog)
+    if (params?.name) sp.set("name", params.name)
+    const query = sp.toString()
+    const res = await request<ApiResponse<Skill>>(`/api/skills${query ? `?${query}` : ""}`)
+    return res.items || []
+}
+
+export async function getAdminConfig(): Promise<{ skillSyncScript: string }> {
+    return request("/health")
+}

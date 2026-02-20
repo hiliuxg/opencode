@@ -96,3 +96,50 @@
 *   **参数 (Path)**:
     *   `id`: 执行记录 ID。
 *   **返回**: 单个执行记录详情。
+
+## 4. 技能中心 (Skill Hub)
+
+基础路径: `/api/skills`
+
+### 4.1 获取技能列表
+*   **路径**: `GET /api/skills`
+*   **参数 (Query)**:
+    *   `catalog` (可选): 字符串，过滤指定分类的技能。
+    *   `name` (可选): 字符串，过滤指定名称的技能。
+*   **返回**: 
+    ```json
+    {
+      "ok": true,
+      "items": [
+        {
+          "id": 1,
+          "name": "技能名称",
+          "catalog": "分类名称",
+          "description": "描述",
+          "userId": 1,
+          "stars": 0,
+          "createdAt": "2024-05-20T10:00:00.000Z",
+          "updatedAt": "2024-05-20T10:00:00.000Z",
+          "latestVersion": "1.0.0"
+        }
+      ]
+    }
+    ```
+
+### 4.2 上传技能包
+*   **路径**: `POST /api/skills`
+*   **参数 (Body - multipart/form-data)**:
+    *   `file` (必填): 文件对象，技能包 (例如 `.zip` 文件)。
+    *   `name` (必填): 字符串，技能名称。
+    *   `catalog` (必填): 字符串，技能分类，必须为 `会员`、`长音频`、`规模`、`AIK` 或 `直播` 之一。
+    *   `version` (必填): 字符串，技能版本号。
+    *   `userId` (必填): 字符串，上传用户的名称或数字 ID。
+    *   `description` (可选): 字符串，技能描述。
+*   **返回**: 
+    ```json
+    {
+      "ok": true,
+      "skillId": 2,
+      "version": "1.0.0"
+    }
+    ```

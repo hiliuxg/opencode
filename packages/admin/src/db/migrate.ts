@@ -13,6 +13,8 @@ export async function runMigrations() {
   await db.execute(sql.raw(`DROP TABLE IF EXISTS cron_executions`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS cron_jobs`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS users`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS skill_versions`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS skills`))
 
   console.log("[migrate] creating tables...")
   await db.execute(sql.raw(`
@@ -56,6 +58,30 @@ export async function runMigrations() {
       duration        BIGINT,
       started_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       completed_at    TIMESTAMP NULL
+    )
+  `))
+
+  await db.execute(sql.raw(`
+    CREATE TABLE skills (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      name            VARCHAR(255) NOT NULL,
+      catalog         VARCHAR(50) NOT NULL,
+      description     TEXT,
+      user_id         INT NOT NULL,
+      stars           INT DEFAULT 0,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY name_catalog_idx (name, catalog)
+    )
+  `))
+
+  await db.execute(sql.raw(`
+    CREATE TABLE skill_versions (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      skill_id        INT NOT NULL,
+      version         VARCHAR(50) NOT NULL,
+      path            VARCHAR(1024) NOT NULL,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `))
 

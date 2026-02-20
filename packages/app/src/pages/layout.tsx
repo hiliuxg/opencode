@@ -49,6 +49,7 @@ import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme"
 import { DialogSelectProvider } from "@/components/dialog-select-provider"
 import { DialogSelectServer } from "@/components/dialog-select-server"
 import { DialogSettings } from "@/components/dialog-settings"
+import { DialogScheduler } from "@/components/dialog-scheduler"
 import { useCommand, type CommandOption } from "@/context/command"
 import { ConstrainDragXAxis } from "@/utils/solid-dnd"
 import { navStart } from "@/utils/perf"
@@ -1093,6 +1094,10 @@ export default function Layout(props: ParentProps) {
     dialog.show(() => <DialogSettings />)
   }
 
+  function openScheduler() {
+    dialog.show(() => <DialogScheduler currentDir={currentDir()} />)
+  }
+
   function navigateToProject(directory: string | undefined) {
     if (!directory) return
     server.projects.touch(directory)
@@ -1798,7 +1803,11 @@ export default function Layout(props: ParentProps) {
                             size="large"
                             icon="plus-small"
                             class="w-full"
-                            onClick={() => navigateWithSidebarReset(`/${base64Encode(p().worktree)}/session`)}
+                            onClick={async () => {
+                              const dir = p().worktree
+                              await globalSDK.client.instance.dispose({ directory: dir }).catch(() => undefined)
+                              navigateWithSidebarReset(`/${base64Encode(dir)}/session`)
+                            }}
                           >
                             {language.t("command.session.new")}
                           </Button>
@@ -1898,6 +1907,12 @@ export default function Layout(props: ParentProps) {
     )
   }
 
+  const openSkills = () => {
+    const dir = currentDir()
+    if (!dir) return
+    navigateWithSidebarReset(`/${base64Encode(dir)}/skills`)
+  }
+
   return (
     <div class="relative bg-background-base flex-1 min-h-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text">
       <Titlebar />
@@ -1947,6 +1962,10 @@ export default function Layout(props: ParentProps) {
               renderProjectOverlay={() => (
                 <ProjectDragOverlay projects={() => layout.projects.list()} activeProject={() => store.activeProject} />
               )}
+              schedulerLabel={() => "定时器"}
+              onOpenScheduler={openScheduler}
+              skillsLabel={() => "Skills"}
+              onOpenSkills={openSkills}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}
@@ -2012,6 +2031,10 @@ export default function Layout(props: ParentProps) {
               renderProjectOverlay={() => (
                 <ProjectDragOverlay projects={() => layout.projects.list()} activeProject={() => store.activeProject} />
               )}
+              schedulerLabel={() => "定时器"}
+              onOpenScheduler={openScheduler}
+              skillsLabel={() => "Skills"}
+              onOpenSkills={openSkills}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}

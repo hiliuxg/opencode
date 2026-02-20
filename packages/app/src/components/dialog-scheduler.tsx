@@ -170,10 +170,27 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
 
 function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
     const { t } = useLanguage()
+    const [filterStatus, setFilterStatus] = createSignal<string>("all")
+
+    const STATUS_OPTIONS = [
+        { value: "all", label: t("scheduler.jobs.filter.all") },
+        { value: "enabled", label: t("scheduler.jobs.filter.enabled") },
+        { value: "disabled", label: t("scheduler.jobs.filter.disabled") },
+    ]
+
     const [jobs, { refetch }] = createResource(
         () => props.refreshKey(),
         () => getJobs(String(DEFAULT_USER_ID), props.workspaceDir).catch(() => [] as CronJob[]),
     )
+
+    const filteredJobs = createMemo(() => {
+        const list = jobs() ?? []
+        const status = filterStatus()
+        if (status === "all") return list
+        if (status === "enabled") return list.filter((j) => j.enabled)
+        if (status === "disabled") return list.filter((j) => !j.enabled)
+        return list
+    })
 
     const handleToggle = async (job: CronJob) => {
         try {
@@ -204,9 +221,27 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
     }
 
     return (
-        <div class="flex flex-col gap-1 p-4">
+        <div class="flex flex-col gap-3 p-4">
+            {/* 头部过滤与刷新 */}
+            <div class="flex items-center gap-3">
+                <Select
+                    options={STATUS_OPTIONS}
+                    current={STATUS_OPTIONS.find((o) => o.value === (filterStatus() || "all"))}
+                    value={(o) => o.value}
+                    label={(o) => o.label}
+                    onSelect={(o) => {
+                        setFilterStatus(String(o?.value ?? "all"))
+                    }}
+                    size="large"
+                    variant="secondary"
+                />
+                <Button variant="ghost" size="normal" onClick={() => refetch()} icon="refresh">
+                    {t("scheduler.jobs.refresh")}
+                </Button>
+            </div>
+
             <Show
-                when={!jobs.loading && (jobs() ?? []).length > 0}
+                when={!jobs.loading && (filteredJobs() ?? []).length > 0}
                 fallback={
                     <div class="flex items-center justify-center py-12 text-14-regular text-text-weak">
                         {jobs.loading ? t("scheduler.jobs.loading") : t("scheduler.jobs.empty")}
@@ -214,7 +249,7 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                 }
             >
                 <div class="flex flex-col gap-2">
-                    <For each={jobs()}>
+                    <For each={filteredJobs()}>
                         {(job) => (
                             <div class="group flex flex-col gap-3 p-4 rounded-xl border border-border-weak bg-surface-base hover:bg-surface-base-hover hover:border-border-strong/40 transition-all duration-300 shadow-sm">
                                 {/* Header: Icon + Name/Cron + Actions (Play, Delete, Switch) */}
@@ -228,6 +263,7 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                                                 {job.name}
                                             </div>
                                             <div class="flex items-center gap-1.5 text-12-regular text-text-weak/70 font-mono tracking-tighter">
+                                                <Icon name="clock" class="size-3 opacity-50" />
                                                 {job.cronExpression}
                                             </div>
                                         </div>
@@ -255,11 +291,13 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                                                 />
                                             </Tooltip>
                                         </div>
-                                        <Switch
-                                            checked={job.enabled}
-                                            onChange={() => handleToggle(job)}
-                                            hideLabel
-                                        />
+                                        <Tooltip value={job.enabled ? t("scheduler.jobs.action.disable") : t("scheduler.jobs.action.enable")}>
+                                            <Switch
+                                                checked={job.enabled}
+                                                onChange={() => handleToggle(job)}
+                                                hideLabel
+                                            />
+                                        </Tooltip>
                                     </div>
                                 </div>
 
@@ -276,16 +314,18 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                                     </p>
                                 </div>
 
+                                <Show when={job.enabled && job.nextRun}>
+                                    <div class="flex items-center gap-1.5 text-11-regular text-text-weak/50 mt-1 pl-1">
+                                        <Icon name="clock" class="size-3 opacity-40" />
+                                        <span>{t("scheduler.jobs.nextRun", { time: new Date(job.nextRun!).toLocaleString() })}</span>
+                                    </div>
+                                </Show>
+
                             </div>
                         )}
                     </For>
                 </div>
             </Show>
-            <div class="flex justify-end pt-2">
-                <Button variant="ghost" size="normal" onClick={() => refetch()} icon="refresh">
-                    {t("scheduler.jobs.refresh")}
-                </Button>
-            </div>
         </div>
     )
 }

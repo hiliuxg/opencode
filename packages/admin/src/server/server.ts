@@ -5,6 +5,7 @@ import { logger } from "hono/logger"
 import { CronRoutes } from "./routes/cron"
 import { HealthRoutes } from "./routes/health"
 import { ExecutionRoutes } from "./routes/execution"
+import { SkillsRoutes } from "./routes/skills"
 
 export function createApp() {
     const app = new Hono()
@@ -17,6 +18,7 @@ export function createApp() {
     app.route("/health", HealthRoutes())
     app.route("/api/jobs", CronRoutes())
     app.route("/api/executions", ExecutionRoutes())
+    app.route("/api/skills", SkillsRoutes())
 
     // TODO: app.route("/api/users", UserRoutes())
 

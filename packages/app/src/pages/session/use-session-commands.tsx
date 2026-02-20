@@ -75,7 +75,13 @@ export const useSessionCommands = (input: SessionCommandContext) => {
       title: input.language.t("command.session.new"),
       keybind: "mod+shift+s",
       slash: "new",
-      onSelect: () => input.navigate(`/${input.params.dir}/session`),
+      onSelect: async () => {
+        const dir = input.sdk.directory
+        if (dir) {
+          await input.sdk.client.instance.dispose({ directory: dir }).catch(() => undefined)
+        }
+        input.navigate(`/${input.params.dir}/session`)
+      },
     }),
   ])
 
@@ -281,7 +287,7 @@ export const useSessionCommands = (input: SessionCommandContext) => {
         const sessionID = input.params.id
         if (!sessionID) return
         if (input.status()?.type !== "idle") {
-          await input.sdk.client.session.abort({ sessionID }).catch(() => {})
+          await input.sdk.client.session.abort({ sessionID }).catch(() => { })
         }
         const revert = input.info()?.revert?.messageID
         const message = findLast(input.userMessages(), (x) => !revert || x.id < revert)

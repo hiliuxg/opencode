@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp, boolean, int, bigint, serial } from "drizzle-orm/mysql-core"
+import { mysqlTable, varchar, text, timestamp, boolean, int, bigint, serial, uniqueIndex } from "drizzle-orm/mysql-core"
 
 export const users = mysqlTable("users", {
     id: serial("id").primaryKey(),
@@ -36,4 +36,25 @@ export const cronExecutions = mysqlTable("cron_executions", {
     duration: bigint("duration", { mode: "number" }), // ms
     startedAt: timestamp("started_at").defaultNow(),
     completedAt: timestamp("completed_at"),
+})
+
+export const skills = mysqlTable("skills", {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    catalog: varchar("catalog", { length: 50 }).notNull(),
+    description: text("description"),
+    userId: int("user_id").notNull(),
+    stars: int("stars").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (t) => ({
+    unq: uniqueIndex("name_catalog_idx").on(t.name, t.catalog),
+}))
+
+export const skillVersions = mysqlTable("skill_versions", {
+    id: serial("id").primaryKey(),
+    skillId: int("skill_id").notNull(),
+    version: varchar("version", { length: 50 }).notNull(),
+    path: varchar("path", { length: 1024 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
 })

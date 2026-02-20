@@ -58,6 +58,7 @@ import { SessionPromptDock } from "@/pages/session/session-prompt-dock"
 import { SessionMobileTabs } from "@/pages/session/session-mobile-tabs"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
+import { setCursorPosition } from "@/components/prompt-input/editor-dom"
 
 type HandoffSession = {
   prompt: string
@@ -1483,6 +1484,21 @@ export default function Page() {
     anchor,
     scheduleScrollState,
     consumePendingMessage: layout.pendingMessage.consume,
+  })
+
+  createEffect(() => {
+    if (!prompt.ready()) return
+    const value = sessionStorage.getItem("opencode.handoff.prompt")
+    if (value) {
+      sessionStorage.removeItem("opencode.handoff.prompt")
+      prompt.set([{ type: "text", content: value, start: 0, end: value.length }], value.length)
+      focusInput()
+      if (inputRef) {
+        requestAnimationFrame(() => {
+          setCursorPosition(inputRef, value.length)
+        })
+      }
+    }
   })
 
   createEffect(() => {

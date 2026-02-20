@@ -26,6 +26,10 @@ export const SidebarContent = (props: {
   openProjectKeybind: Accessor<string | undefined>
   onOpenProject: () => void
   renderProjectOverlay: () => JSX.Element
+  schedulerLabel: Accessor<string>
+  onOpenScheduler: () => void
+  skillsLabel: Accessor<string>
+  onOpenSkills: () => void
   settingsLabel: Accessor<string>
   settingsKeybind: Accessor<string | undefined>
   onOpenSettings: () => void
@@ -79,6 +83,24 @@ export const SidebarContent = (props: {
           </DragDropProvider>
         </div>
         <div class="shrink-0 w-full pt-3 pb-3 flex flex-col items-center gap-2">
+          <Tooltip placement={placement()} value={props.schedulerLabel()}>
+            <IconButton
+              icon="clock"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenScheduler}
+              aria-label={props.schedulerLabel()}
+            />
+          </Tooltip>
+          <Tooltip placement={placement()} value={props.skillsLabel()}>
+            <IconButton
+              icon="mcp"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenSkills}
+              aria-label={props.skillsLabel()}
+            />
+          </Tooltip>
           <TooltipKeybind placement={placement()} title={props.settingsLabel()} keybind={props.settingsKeybind() ?? ""}>
             <IconButton
               icon="settings-gear"
