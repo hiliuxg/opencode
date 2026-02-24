@@ -1098,6 +1098,12 @@ export default function Layout(props: ParentProps) {
     dialog.show(() => <DialogScheduler currentDir={currentDir()} />)
   }
 
+  function openApiDoc() {
+    const dir = currentDir()
+    if (!dir) return
+    navigateWithSidebarReset(`/${base64Encode(dir)}/api-doc`)
+  }
+
   function navigateToProject(directory: string | undefined) {
     if (!directory) return
     server.projects.touch(directory)
@@ -1966,6 +1972,8 @@ export default function Layout(props: ParentProps) {
               onOpenScheduler={openScheduler}
               skillsLabel={() => "Skills"}
               onOpenSkills={openSkills}
+              apiDocLabel={() => language.t("sidebar.apiDoc")}
+              onOpenApiDoc={openApiDoc}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}
@@ -2035,6 +2043,8 @@ export default function Layout(props: ParentProps) {
               onOpenScheduler={openScheduler}
               skillsLabel={() => "Skills"}
               onOpenSkills={openSkills}
+              apiDocLabel={() => language.t("sidebar.apiDoc")}
+              onOpenApiDoc={openApiDoc}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}

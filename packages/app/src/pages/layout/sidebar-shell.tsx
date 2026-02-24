@@ -30,6 +30,8 @@ export const SidebarContent = (props: {
   onOpenScheduler: () => void
   skillsLabel: Accessor<string>
   onOpenSkills: () => void
+  apiDocLabel: Accessor<string>
+  onOpenApiDoc: () => void
   settingsLabel: Accessor<string>
   settingsKeybind: Accessor<string | undefined>
   onOpenSettings: () => void
@@ -99,6 +101,15 @@ export const SidebarContent = (props: {
               size="large"
               onClick={props.onOpenSkills}
               aria-label={props.skillsLabel()}
+            />
+          </Tooltip>
+          <Tooltip placement={placement()} value={props.apiDocLabel()}>
+            <IconButton
+              icon="code"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenApiDoc}
+              aria-label={props.apiDocLabel()}
             />
           </Tooltip>
           <TooltipKeybind placement={placement()} title={props.settingsLabel()} keybind={props.settingsKeybind() ?? ""}>

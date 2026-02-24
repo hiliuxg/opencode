@@ -49,10 +49,17 @@ const SessionRoute = () => (
 )
 
 const Skills = lazy(() => import("@/pages/skills"))
+const ApiDoc = lazy(() => import("@/pages/api-doc"))
 
 const SkillsRoute = () => (
   <Suspense fallback={<Loading />}>
     <Skills />
+  </Suspense>
+)
+
+const ApiDocRoute = () => (
+  <Suspense fallback={<Loading />}>
+    <ApiDoc />
   </Suspense>
 )
 
@@ -197,6 +204,7 @@ export function AppInterface(props: { defaultUrl?: string; children?: JSX.Elemen
                 <Route path="/" component={SessionIndexRoute} />
                 <Route path="/session/:id?" component={SessionRoute} />
                 <Route path="/skills" component={SkillsRoute} />
+                <Route path="/api-doc" component={ApiDocRoute} />
               </Route>
             </Router>
           </GlobalSyncProvider>

@@ -21,6 +21,15 @@ export const dict = {
   "command.category.workspace": "工作区",
   "command.category.settings": "设置",
 
+  "sidebar.apiDoc": "API文档",
+  "apiDoc.title": "REST API 快速开始",
+  "apiDoc.step1.title": "1. 设置环境变量",
+  "apiDoc.step2.title": "2. 创建会话",
+  "apiDoc.step3.title": "3. 发送 Prompt",
+  "apiDoc.step3.hint": "请将 <session_id> 替换为步骤 2 返回的 \"id\" 字段。",
+  "apiDoc.step4.title": "4. 查看会话记录",
+  "apiDoc.step4.hint": "将 <dir_base64> 替换为目录的 Base64 编码，<session_id> 替换为步骤 2 返回的 id。",
+
   "theme.scheme.system": "系统",
   "theme.scheme.light": "浅色",
   "theme.scheme.dark": "深色",

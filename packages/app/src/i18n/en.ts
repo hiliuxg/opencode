@@ -17,6 +17,15 @@ export const dict = {
   "command.category.workspace": "Workspace",
   "command.category.settings": "Settings",
 
+  "sidebar.apiDoc": "API Docs",
+  "apiDoc.title": "REST API Quick Start",
+  "apiDoc.step1.title": "1. Set Environment Variables",
+  "apiDoc.step2.title": "2. Create Session",
+  "apiDoc.step3.title": "3. Send Prompt",
+  "apiDoc.step3.hint": "Replace <session_id> with the \"id\" field returned in Step 2.",
+  "apiDoc.step4.title": "4. View Session",
+  "apiDoc.step4.hint": "Replace <dir_base64> with your directory's Base64 encoding, and <session_id> with the id from Step 2.",
+
   "theme.scheme.system": "System",
   "theme.scheme.light": "Light",
   "theme.scheme.dark": "Dark",
