@@ -379,6 +379,7 @@ export const dict = {
   "skills.download.success.title": "下载成功",
   "skills.download.success.description": "成功将 {{name}} 下载到本地工作区",
   "skills.download.failed.title": "下载失败",
+  "skills.creator.prompt": "使用 skill-creator 创建技能 \n",
 
   "dialog.project.edit.title": "编辑项目",
   "dialog.project.edit.name": "名称",

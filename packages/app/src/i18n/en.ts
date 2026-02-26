@@ -362,6 +362,7 @@ export const dict = {
   "skills.download.success.title": "Download successful",
   "skills.download.success.description": "Successfully downloaded {{name}} to local workspace",
   "skills.download.failed.title": "Download failed",
+  "skills.creator.prompt": "Use skill-creator to create skills \n",
 
   "dialog.project.edit.title": "Edit project",
   "dialog.project.edit.name": "Name",

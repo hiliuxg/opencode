@@ -58,7 +58,7 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        const promptString = "/skill-creator "
+        const promptString = language.t("skills.creator.prompt")
         sessionStorage.setItem("opencode.handoff.prompt", promptString)
 
         const href = `/${base64Encode(dir)}/session`
