@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <!-- Gradient for the star -->
+    <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for hexagon -->
+    <linearGradient id="hexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:0.1" />
+    </linearGradient>
+    
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background hexagon pattern -->
+  <g opacity="0.15">
+    <polygon points="100,30 140,50 140,90 100,110 60,90 60,50" fill="url(#hexGradient)" stroke="#3B82F6" stroke-width="1"/>
+    <polygon points="100,90 140,110 140,150 100,170 60,150 60,110" fill="url(#hexGradient)" stroke="#3B82F6" stroke-width="1"/>
+  </g>
+  
+  <!-- Central star with glow -->
+  <g filter="url(#glow)">
+    <!-- Main star shape -->
+    <polygon points="100,45 115,85 160,85 125,110 140,150 100,125 60,150 75,110 40,85 85,85" 
+             fill="url(#starGradient)"/>
+    
+    <!-- Inner highlight -->
+    <polygon points="100,60 110,90 145,90 120,105 130,135 100,115 70,135 80,105 55,90 90,90" 
+             fill="#F59E0B" opacity="0.3"/>
+  </g>
+  
+  <!-- Data nodes around the star -->
+  <g>
+    <!-- Top node -->
+    <circle cx="100" cy="25" r="4" fill="#F59E0B">
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Right node -->
+    <circle cx="165" cy="85" r="3" fill="#3B82F6">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Bottom node -->
+    <circle cx="100" cy="165" r="4" fill="#1E40AF">
+      <animate attributeName="opacity" values="1;0.5;1" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Left node -->
+    <circle cx="35" cy="85" r="3" fill="#F59E0B">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- Connection lines (subtle) -->
+  <g opacity="0.2" stroke="#3B82F6" stroke-width="0.5">
+    <line x1="100" y1="25" x2="165" y2="85"/>
+    <line x1="165" y1="85" x2="100" y2="165"/>
+    <line x1="100" y1="165" x2="35" y2="85"/>
+    <line x1="35" y1="85" x2="100" y2="25"/>
+  </g>
+</svg>
