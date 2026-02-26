@@ -241,7 +241,9 @@ export default function ApiDoc() {
     const server = useServer()
 
     const [spec] = createResource(async () => {
-        const res = await fetch(`${server.url}/doc`)
+        const url = server.current?.http.url
+        if (!url) throw new Error("No server URL")
+        const res = await fetch(`${url}/doc`)
         return res.json()
     })
 
@@ -260,7 +262,7 @@ export default function ApiDoc() {
                 <h1 class="text-20-medium text-text-strong mb-6">{language.t("apiDoc.title")}</h1>
 
                 <Step title={language.t("apiDoc.step1.title")}>
-                    <CodeBlock code={`export OPENCODE_HOST="${server.url}"\nexport OPENCODE_DIR="/your/workspace/path"`} name="env.sh" />
+                    <CodeBlock code={`export OPENCODE_HOST="${server.current?.http.url ?? ""}"\nexport OPENCODE_DIR="/your/workspace/path"`} name="env.sh" />
                 </Step>
                 <Step title={language.t("apiDoc.step2.title")}>
                     <CodeBlock
