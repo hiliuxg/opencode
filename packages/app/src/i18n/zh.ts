@@ -379,7 +379,7 @@ export const dict = {
   "skills.download.success.title": "下载成功",
   "skills.download.success.description": "成功将 {{name}} 下载到本地工作区",
   "skills.download.failed.title": "下载失败",
-  "skills.creator.prompt": "使用 skill-creator 创建技能 \n",
+  "skills.creator.prompt": "使用`skill-creator`创建技能",
 
   "dialog.project.edit.title": "编辑项目",
   "dialog.project.edit.name": "名称",
@@ -849,7 +849,7 @@ export const dict = {
   "scheduler.tab.jobs": "任务列表",
   "scheduler.tab.history": "执行历史",
   "scheduler.create.name.label": "任务名称",
-  "scheduler.create.name.placeholder": "例如：每日代码审查",
+  "scheduler.create.name.placeholder": "例如：每日规模分析洞察",
   "scheduler.create.frequency.label": "执行频率",
   "scheduler.create.frequency.daily": "按天",
   "scheduler.create.frequency.hourly": "按小时",
