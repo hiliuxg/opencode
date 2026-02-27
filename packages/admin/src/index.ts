@@ -1,38 +1,78 @@
+import yargs from "yargs"
+import { hideBin } from "yargs/helpers"
 import { Config } from "./config"
-import { runMigrations } from "./db/migrate"
 import { cronEngine } from "./cron/engine"
 import { executor } from "./cron/executor"
 import { createApp } from "./server/server"
+import { Log } from "./util/log"
+
+const log = Log.create({ service: "main" })
 
 async function main() {
-    console.log("[admin] starting opencode-admin service...")
+    const argv = await yargs(hideBin(process.argv))
+        .option("host", {
+            type: "string",
+            description: "Server host",
+            default: Config.hostname,
+        })
+        .option("port", {
+            type: "number",
+            description: "Server port",
+            default: Config.port,
+        })
+        .option("log-level", {
+            type: "string",
+            description: "Log level",
+            choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+            default: "INFO",
+        })
+        .option("basepath", {
+            type: "string",
+            description: "Base path",
+            default: Config.basepath,
+        })
+        .parse()
 
-    // 1. Run database migrations
-    await runMigrations()
+    await Log.init({
+        print: true, // we can support file via other options later, for now we print to terminal and log file
+        level: argv.logLevel as Log.Level,
+    })
 
-    // 2. Bootstrap cron engine (load enabled jobs from DB)
+    // Override Config with parsed arguments
+    Config.hostname = argv.host
+    Config.port = argv.port
+    Config.basepath = argv.basepath
+
+    log.info("[admin] starting opencode-admin service...")
+
+    // 1. Bootstrap cron engine (load enabled jobs from DB)
     await cronEngine.bootstrap()
 
-    // 3. Wire executor to cron engine
+    // 2. Wire executor to cron engine
     cronEngine.setTriggerHandler((jobId) => {
-        console.log(`[admin] cron triggered job=${jobId}`)
+        log.info(`[admin] cron triggered job=${jobId}`)
         executor.enqueue(jobId)
     })
 
-    // 4. Start HTTP server
-    const app = createApp()
+    // 3. Start HTTP server
+    const app = createApp(Config)
     const server = Bun.serve({
         hostname: Config.hostname,
         port: Config.port,
         fetch: app.fetch,
     })
 
-    console.log(`[admin] listening on http://${server.hostname}:${server.port}`)
-    console.log(`[admin] database: mysql://${Config.db.host}:${Config.db.port}/${Config.db.database}`)
-    console.log(`[admin] scheduled jobs: ${cronEngine.size}`)
+    let bp = ""
+    if (Config.basepath !== "") {
+        bp = "/" + (Config.basepath.endsWith("/") ? Config.basepath.slice(0, -1) : Config.basepath)
+    }
+
+    log.info(`[admin] listening on http://${server.hostname}:${server.port}${bp}`)
+    log.info(`[admin] database: mysql://${Config.db.host}:${Config.db.port}/${Config.db.database}`)
+    log.info(`[admin] scheduled jobs: ${cronEngine.size}`)
 }
 
 main().catch((err) => {
-    console.error("[admin] fatal:", err)
+    log.error("[admin] fatal:", err)
     process.exit(1)
 })

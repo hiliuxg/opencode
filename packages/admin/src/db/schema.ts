@@ -58,3 +58,36 @@ export const skillVersions = mysqlTable("skill_versions", {
     path: varchar("path", { length: 1024 }).notNull(),
     createdAt: timestamp("created_at").defaultNow(),
 })
+
+export const configs = mysqlTable("configs", {
+    id: serial("id").primaryKey(),
+    key: varchar("key", { length: 255 }).notNull().unique(),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+})
+
+export const dockerContainers = mysqlTable("docker_containers", {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    image: varchar("image", { length: 255 }).notNull(),
+    status: varchar("status", { length: 50 }).default("running"),
+    ports: varchar("ports", { length: 255 }),
+    userId: int("user_id"),
+    containerId: varchar("container_id", { length: 255 }),
+    host: varchar("host", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+})
+
+export const dataReports = mysqlTable("data_reports", {
+    id: serial("id").primaryKey(),
+    title: varchar("title", { length: 255 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    status: varchar("status", { length: 50 }).default("pending"),
+    content: text("content"),
+    result: text("result"),
+    userId: int("user_id"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+})

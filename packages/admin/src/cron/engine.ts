@@ -2,6 +2,7 @@ import { Cron } from "croner"
 
 import { getDb, schema } from "../db/client"
 import { eq } from "drizzle-orm"
+import { Log } from "../util/log"
 
 export class CronEngine {
     private jobs = new Map<string, Cron>()
@@ -23,7 +24,7 @@ export class CronEngine {
             .from(schema.cronJobs)
             .where(eq(schema.cronJobs.enabled, true))
 
-        console.log(`[CronEngine] bootstrapping ${jobs.length} enabled job(s)`)
+        Log.Default.info(`[CronEngine] bootstrapping ${jobs.length} enabled job(s)`)
         for (const job of jobs) {
             this.schedule(job.id, job.cronExpression, job.timezone ?? "UTC")
         }
@@ -34,13 +35,13 @@ export class CronEngine {
         this.unschedule(jobId)
         try {
             const task = new Cron(cronExpression, { timezone }, () => {
-                console.log(`[CronEngine] triggered job=${jobId}`)
+                Log.Default.info(`[CronEngine] triggered job=${jobId}`)
                 this.onTrigger?.(jobId)
             })
             this.jobs.set(jobId, task)
-            console.log(`[CronEngine] scheduled job=${jobId} cron="${cronExpression}" tz=${timezone}`)
-        } catch (err) {
-            console.error(`[CronEngine] failed to schedule job=${jobId}:`, err)
+            Log.Default.info(`[CronEngine] scheduled job=${jobId} cron="${cronExpression}" tz=${timezone}`)
+        } catch (err: any) {
+            Log.Default.error(`[CronEngine] failed to schedule job=${jobId}:`, err instanceof Error ? { error: err.message, stack: err.stack } : { error: String(err) })
         }
     }
 
@@ -65,7 +66,7 @@ export class CronEngine {
             cron.stop()
         }
         this.jobs.clear()
-        console.log("[CronEngine] all jobs stopped")
+        Log.Default.info("[CronEngine] all jobs stopped")
     }
 
     /** Number of actively scheduled jobs */

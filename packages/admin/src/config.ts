@@ -1,11 +1,11 @@
 import { join } from "node:path"
-import { homedir } from "node:os"
 
 export const Config = {
   /** Server port */
-  port: Number(process.env.ADMIN_PORT ?? 8787),
+  port: 8787,
   /** Server host */
-  hostname: process.env.ADMIN_HOST ?? "0.0.0.0",
+  hostname: "0.0.0.0",
+  basepath: "",
   /** MySQL Database configuration */
   db: {
     host: process.env.MYSQL_HOST ?? "localhost",
@@ -20,3 +20,4 @@ export const Config = {
     syncScript: process.env.SKILL_SYNC_SCRIPT ?? join(process.cwd(), "..", "..", "scripts", "skill_sync.sh"),
   }
 }
+

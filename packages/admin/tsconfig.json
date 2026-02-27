@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
     ],
     "module": "esnext",
     "target": "esnext",
@@ -13,7 +15,8 @@
     "strict": true,
     "downlevelIteration": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
@@ -27,6 +30,7 @@
     }
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.tsx"
   ]
 }

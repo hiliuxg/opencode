@@ -1,6 +1,9 @@
 import { getDb } from "../db/client"
 import { users, cronJobs } from "../db/schema"
 import { sql } from "drizzle-orm"
+import { Log } from "../util/log"
+
+const log = Log.create({ service: "migrate" })
 
 /**
  * Simple migration: create tables if they don't exist.
@@ -9,14 +12,19 @@ import { sql } from "drizzle-orm"
 export async function runMigrations() {
   const db = getDb()
 
-  console.log("[migrate] dropping existing tables...")
+  log.info("[migrate] dropping existing tables...")
+  await db.execute(sql.raw(`SET FOREIGN_KEY_CHECKS = 0;`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS data_reports`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS docker_containers`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS configs`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS cron_executions`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS cron_jobs`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS users`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS skill_versions`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS skills`))
+  await db.execute(sql.raw(`SET FOREIGN_KEY_CHECKS = 1;`))
 
-  console.log("[migrate] creating tables...")
+  log.info("[migrate] creating tables...")
   await db.execute(sql.raw(`
     CREATE TABLE users (
       id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -85,13 +93,44 @@ export async function runMigrations() {
     )
   `))
 
-  try {
-    await db.execute(sql.raw(`CREATE INDEX idx_exec_job ON cron_executions(job_id)`))
-  } catch (e) { }
+  await db.execute(sql.raw(`
+    CREATE TABLE configs(
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      \`key\`         VARCHAR(255) NOT NULL UNIQUE,
+      value           TEXT NOT NULL,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `))
 
-  try {
-    await db.execute(sql.raw(`CREATE INDEX idx_exec_started ON cron_executions(started_at)`))
-  } catch (e) { }
+  await db.execute(sql.raw(`
+    CREATE TABLE docker_containers (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      name            VARCHAR(255) NOT NULL,
+      image           VARCHAR(255) NOT NULL,
+      status          VARCHAR(50) DEFAULT 'running',
+      ports           VARCHAR(255),
+      user_id         INT,
+      container_id    VARCHAR(255),
+      host            VARCHAR(255),
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `))
+
+  await db.execute(sql.raw(`
+    CREATE TABLE data_reports (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      title           VARCHAR(255) NOT NULL,
+      type            VARCHAR(50) NOT NULL,
+      status          VARCHAR(50) DEFAULT 'pending',
+      content         TEXT,
+      result          TEXT,
+      user_id         INT,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `))
 
   // Ensure default user exists
   try {
@@ -100,12 +139,12 @@ export async function runMigrations() {
       VALUES (1, 'leoliu', NULL, 'http://127.0.0.1:4096', 'active')
       ON DUPLICATE KEY UPDATE name = 'leoliu'
     `))
-    console.log("[migrate] default user 'leoliu' (id: 1) ensured")
+    log.info("[migrate] default user 'leoliu' (id: 1) ensured")
   } catch (err: any) {
-    console.warn("[migrate] failed to seed default user:", err.message)
+    log.warn("[migrate] failed to seed default user:", err.message)
   }
 
-  console.log("[migrate] tables ensured")
+  log.info("[migrate] tables ensured")
 }
 
 // Run if called directly
@@ -113,7 +152,7 @@ if (import.meta.path === Bun.main) {
   runMigrations()
     .then(() => process.exit(0))
     .catch((err) => {
-      console.error("[migrate] failed:", err)
+      log.error("[migrate] failed:", err)
       process.exit(1)
     })
 }

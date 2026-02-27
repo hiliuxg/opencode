@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm"
 import { getDb, schema } from "../../db/client"
 import { cronEngine } from "../../cron/engine"
 import { executor } from "../../cron/executor"
+import { Log } from "../../util/log"
 
 const { cronJobs } = schema
 
@@ -66,7 +67,7 @@ export function CronRoutes() {
         const result = jobs.map((job: any) => ({
             ...job,
             config: job.config ? JSON.parse(job.config) : null,
-            nextRun: cronEngine.nextRun(job.id)?.toISOString() ?? null,
+            nextRun: cronEngine.nextRun(String(job.id))?.toISOString() ?? null,
         }))
 
         return c.json({ ok: true, items: result })
@@ -83,7 +84,7 @@ export function CronRoutes() {
             item: {
                 ...job,
                 config: job.config ? JSON.parse(job.config) : null,
-                nextRun: cronEngine.nextRun(job.id)?.toISOString() ?? null,
+                nextRun: cronEngine.nextRun(String(job.id))?.toISOString() ?? null,
             },
         })
     })
@@ -138,7 +139,7 @@ export function CronRoutes() {
             item: {
                 ...created,
                 config: created.config ? JSON.parse(created.config) : null,
-                nextRun: cronEngine.nextRun(id)?.toISOString() ?? null,
+                nextRun: cronEngine.nextRun(String(id))?.toISOString() ?? null,
             },
         }, 201)
     })
@@ -188,7 +189,7 @@ export function CronRoutes() {
             item: {
                 ...updated,
                 config: updated.config ? JSON.parse(updated.config) : null,
-                nextRun: cronEngine.nextRun(id)?.toISOString() ?? null,
+                nextRun: cronEngine.nextRun(String(id))?.toISOString() ?? null,
             },
         })
     })
@@ -238,7 +239,7 @@ export function CronRoutes() {
         const [existing] = await db.select().from(cronJobs).where(eq(cronJobs.id, id))
         if (!existing) return c.json({ ok: false, error: "job_not_found" }, 404)
 
-        console.log(`[CronRoutes] manual trigger for job=${id}`)
+        Log.Default.info(`[CronRoutes] manual trigger for job=${id}`)
         executor.enqueue(String(id))
 
         return c.json({ ok: true, message: "job triggered", jobId: id })

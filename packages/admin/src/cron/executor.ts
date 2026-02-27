@@ -2,6 +2,7 @@ import { getDb, schema } from "../db/client"
 import { eq } from "drizzle-orm"
 import { randomUUID } from "node:crypto"
 import { withRetry } from "./retry"
+import { Log } from "../util/log"
 
 const { cronJobs, users, cronExecutions } = schema
 
@@ -33,7 +34,7 @@ export class Executor {
     /** Enqueue a job for execution */
     async enqueue(jobId: string | number) {
         if (this.running >= this.concurrency) {
-            console.log(`[Executor] queued job=${jobId} (running=${this.running}/${this.concurrency})`)
+            Log.Default.info(`[Executor] queued job=${jobId} (running=${this.running}/${this.concurrency})`)
             this.queue.push(String(jobId))
             return
         }
@@ -58,7 +59,7 @@ export class Executor {
     /** Execute a single job */
     private async execute(jobId: string | number): Promise<ExecutionResult> {
         const startTime = Date.now()
-        console.log(`[Executor] executing job=${jobId}`)
+        Log.Default.info(`[Executor] executing job=${jobId}`)
 
         const db = getDb()
 
@@ -70,13 +71,13 @@ export class Executor {
         } as any)
 
         const executionId = result[0].insertId
-        console.log(`[Executor] created execution record id=${executionId}`)
+        Log.Default.info(`[Executor] created execution record id=${executionId}`)
 
         // 1. Load job + user info
         const [job] = await db.select().from(cronJobs).where(eq(cronJobs.id, Number(jobId) as any))
         if (!job) {
             const error = "job_not_found"
-            console.error(`[Executor] job ${jobId} not found`)
+            Log.Default.error(`[Executor] job ${jobId} not found`)
             await db.update(cronExecutions).set({
                 status: "error",
                 error,
@@ -89,7 +90,7 @@ export class Executor {
         const [user] = await db.select().from(users).where(eq(users.id, job.userId))
         if (!user) {
             const error = "user_not_found"
-            console.error(`[Executor] user ${job.userId} not found for job ${jobId}`)
+            Log.Default.error(`[Executor] user ${job.userId} not found for job ${jobId}`)
             await db.update(cronExecutions).set({
                 status: "error",
                 error,
@@ -101,7 +102,7 @@ export class Executor {
 
         if (!user.containerHost) {
             const error = "no_container_host"
-            console.error(`[Executor] user ${job.userId} has no containerHost configured`)
+            Log.Default.error(`[Executor] user ${job.userId} has no containerHost configured`)
             await db.update(cronExecutions).set({
                 status: "error",
                 error,
@@ -122,7 +123,7 @@ export class Executor {
             )
 
             const duration = Date.now() - startTime
-            console.log(`[Executor] job=${jobId} completed in ${duration}ms sessionId=${result.sessionId}`)
+            Log.Default.info(`[Executor] job=${jobId} completed in ${duration}ms sessionId=${result.sessionId}`)
 
             // 4. Update record (success)
             await db.update(cronExecutions).set({
@@ -136,7 +137,7 @@ export class Executor {
         } catch (err) {
             const duration = Date.now() - startTime
             const error = err instanceof Error ? err.message : String(err)
-            console.error(`[Executor] job=${jobId} failed after ${duration}ms: ${error}`)
+            Log.Default.error(`[Executor] job=${jobId} failed after ${duration}ms: ${error}`)
 
             // 4. Update record (failure)
             await db.update(cronExecutions).set({
@@ -193,7 +194,7 @@ export class Executor {
 
         const session = (await createRes.json()) as { id: string }
         const sessionId = session.id
-        console.log(`[Executor] created session=${sessionId} for job=${job.id}`)
+        Log.Default.info(`[Executor] created session=${sessionId} for job=${job.id}`)
 
         // Step 2: Build prompt input
         const promptBody: Record<string, unknown> = {
