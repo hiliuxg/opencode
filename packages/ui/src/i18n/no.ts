@@ -79,6 +79,12 @@ export const dict: Record<Keys, string> = {
   "ui.tool.todos.read": "Les gjøremål",
   "ui.tool.questions": "Spørsmål",
   "ui.tool.agent": "{{type}}-agent",
+  "ui.tool.mcp.run_query": "Kjør SQL-spørring",
+  "ui.tool.mcp.run_query.input": "Inndata-SQL",
+  "ui.tool.mcp.run_query.output": "Resultater",
+  "ui.tool.mcp.run_query.no_results": "Ingen resultater ennå.",
+  "ui.tool.mcp.render_chart": "Diagram",
+  "ui.tool.skill": "Ferdighet",
 
   "ui.common.file.one": "fil",
   "ui.common.file.other": "filer",
