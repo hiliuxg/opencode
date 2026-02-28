@@ -254,18 +254,18 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "kudata-mcp_run_select_query":
       return {
         icon: "mcp",
-        title: "Run SQL Query",
+        title: i18n.t("ui.tool.mcp.run_query"),
       }
     case "kudata-mcp_render_chart":
       return {
         icon: "chart",
-        title: "Chart",
+        title: i18n.t("ui.tool.mcp.render_chart"),
         subtitle: input.title,
       }
     case "skill":
       return {
         icon: "brain",
-        title: "Skill",
+        title: i18n.t("ui.tool.skill"),
         subtitle: input.name,
       }
     default:
@@ -1939,8 +1939,9 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
-  name: "kudata-mcp_run_select_query",
+  name: "kudata-mcp_sql_query_result",
   render(props) {
+    const i18n = useI18n()
     const codeComponent = useCodeComponent()
     const info = createMemo(() => getToolInfo(props.tool, props.input))
     return (
@@ -1948,15 +1949,15 @@ ToolRegistry.register({
         {...props}
         icon={info().icon}
         trigger={{
-          title: info().title,
-          subtitle: props.input.insanct,
+          title: i18n.t("ui.tool.mcp.run_query"),
+          subtitle: `${props.input.engine}-${props.input.cluster}`,
         }}
       >
         <div data-component="mcp-tool-content">
-          <Tabs defaultValue={props.output ? "output" : "input"}>
+          <Tabs defaultValue={props.input ? "input" : "output"}>
             <Tabs.List>
-              <Tabs.Trigger value="input">Input SQL</Tabs.Trigger>
-              <Tabs.Trigger value="output">Output Results</Tabs.Trigger>
+              <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.run_query.input")}</Tabs.Trigger>
+              <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.run_query.output")}</Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="input">
               <div data-slot="mcp-sql-tabs-content">
@@ -1964,8 +1965,8 @@ ToolRegistry.register({
                   component={codeComponent}
                   file={{
                     name: "input.sql",
-                    contents: props.input.query ?? "",
-                    cacheKey: checksum(props.input.query ?? ""),
+                    contents: props.input.querySql ?? "",
+                    cacheKey: checksum(props.input.querySql ?? ""),
                   }}
                   overflow="scroll"
                 />
@@ -1973,7 +1974,7 @@ ToolRegistry.register({
             </Tabs.Content>
             <Tabs.Content value="output">
               <div data-slot="mcp-sql-tabs-content">
-                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">No results yet.</div>}>
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
                   <Dynamic
                     component={codeComponent}
                     file={{
@@ -2042,6 +2043,8 @@ ToolRegistry.register({
     return (
       <BasicTool
         {...props}
+        defaultOpen
+        forceOpen={!!props.output}
         icon={info().icon}
         trigger={{
           title: info().title,

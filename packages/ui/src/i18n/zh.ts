@@ -80,6 +80,12 @@ export const dict = {
   "ui.tool.todos.read": "读取待办",
   "ui.tool.questions": "问题",
   "ui.tool.agent": "{{type}} 智能体",
+  "ui.tool.mcp.run_query": "执行SQL查询",
+  "ui.tool.mcp.run_query.input": "查询语句",
+  "ui.tool.mcp.run_query.output": "查询结果",
+  "ui.tool.mcp.run_query.no_results": "暂无结果",
+  "ui.tool.mcp.render_chart": "渲染图表",
+  "ui.tool.skill": "加载技能",
 
   "ui.common.file.one": "个文件",
   "ui.common.file.other": "个文件",

@@ -76,6 +76,12 @@ export const dict = {
   "ui.tool.todos.read": "Read to-dos",
   "ui.tool.questions": "Questions",
   "ui.tool.agent": "{{type}} Agent",
+  "ui.tool.mcp.run_query": "Run SQL Query",
+  "ui.tool.mcp.run_query.input": "Input SQL",
+  "ui.tool.mcp.run_query.output": "Output Results",
+  "ui.tool.mcp.run_query.no_results": "No results yet.",
+  "ui.tool.mcp.render_chart": "Chart",
+  "ui.tool.skill": "Skill",
 
   "ui.common.file.one": "file",
   "ui.common.file.other": "files",
