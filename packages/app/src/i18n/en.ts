@@ -18,6 +18,8 @@ export const dict = {
   "command.category.settings": "Settings",
 
   "sidebar.apiDoc": "API Docs",
+  "sidebar.skills": "Skills",
+  "sidebar.scheduler": "Scheduler",
   "apiDoc.title": "REST API Quick Start",
   "apiDoc.step1.title": "1. Set Environment Variables",
   "apiDoc.step2.title": "2. Create Session",

@@ -22,6 +22,8 @@ export const dict = {
   "command.category.settings": "设置",
 
   "sidebar.apiDoc": "API文档",
+  "sidebar.skills": "技能知识",
+  "sidebar.scheduler": "定时器",
   "apiDoc.title": "REST API 快速开始",
   "apiDoc.step1.title": "1. 设置环境变量",
   "apiDoc.step2.title": "2. 创建会话",

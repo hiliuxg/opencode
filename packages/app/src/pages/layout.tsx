@@ -1993,9 +1993,9 @@ export default function Layout(props: ParentProps) {
               renderProjectOverlay={() => (
                 <ProjectDragOverlay projects={() => layout.projects.list()} activeProject={() => store.activeProject} />
               )}
-              schedulerLabel={() => "定时器"}
+              schedulerLabel={() => language.t("sidebar.scheduler")}
               onOpenScheduler={openScheduler}
-              skillsLabel={() => "Skills"}
+              skillsLabel={() => language.t("sidebar.skills")}
               onOpenSkills={openSkills}
               apiDocLabel={() => language.t("sidebar.apiDoc")}
               onOpenApiDoc={openApiDoc}
@@ -2064,9 +2064,9 @@ export default function Layout(props: ParentProps) {
               renderProjectOverlay={() => (
                 <ProjectDragOverlay projects={() => layout.projects.list()} activeProject={() => store.activeProject} />
               )}
-              schedulerLabel={() => "定时器"}
+              schedulerLabel={() => language.t("sidebar.scheduler")}
               onOpenScheduler={openScheduler}
-              skillsLabel={() => "Skills"}
+              skillsLabel={() => language.t("sidebar.skills")}
               onOpenSkills={openSkills}
               apiDocLabel={() => language.t("sidebar.apiDoc")}
               onOpenApiDoc={openApiDoc}
