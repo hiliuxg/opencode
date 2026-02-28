@@ -38,7 +38,7 @@ function applyThemeCss(theme: DesktopTheme, themeId: string, mode: "light" | "da
   if (themeId !== "oc-1") {
     try {
       localStorage.setItem(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
-    } catch {}
+    } catch { }
   }
 
   const fullCss = `:root {
@@ -62,7 +62,7 @@ function cacheThemeVariants(theme: DesktopTheme, themeId: string) {
     const css = themeToCss(tokens)
     try {
       localStorage.setItem(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
-    } catch {}
+    } catch { }
   }
 }
 
@@ -72,8 +72,8 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     const [store, setStore] = createStore({
       themes: DEFAULT_THEMES as Record<string, DesktopTheme>,
       themeId: props.defaultTheme ?? "oc-1",
-      colorScheme: "system" as ColorScheme,
-      mode: getSystemMode(),
+      colorScheme: "light" as ColorScheme,
+      mode: "light" as "light" | "dark",
       previewThemeId: null as string | null,
       previewScheme: null as ColorScheme | null,
     })
@@ -97,6 +97,8 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         setStore("colorScheme", savedScheme)
         if (savedScheme !== "system") {
           setStore("mode", savedScheme)
+        } else {
+          setStore("mode", getSystemMode())
         }
       }
       const currentTheme = store.themes[store.themeId]

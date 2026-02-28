@@ -23,6 +23,15 @@ export default function SkillsPage() {
     const [uploadCatalog, setUploadCatalog] = createSignal("AIK")
     const [isUploading, setIsUploading] = createSignal(false)
 
+    // KB Skill States
+    const [kbModalOpen, setKbModalOpen] = createSignal(false)
+    const [kbEngine, setKbEngine] = createSignal("presto")
+    const [kbCluster, setKbCluster] = createSignal("bi-cloud")
+    const [kbTables, setKbTables] = createSignal<string[]>([])
+    const [kbTableInput, setKbTableInput] = createSignal("")
+    const [kbCatalog, setKbCatalog] = createSignal("AIK")
+    const [kbPurpose, setKbPurpose] = createSignal("")
+
     // Local Skills Resource — 通过 GET /skill 调用后端 Skill.state() 懒加载缓存
     const [skills, { refetch: refetchLocal }] = createResource(async () => {
         const dir = currentDir()
@@ -175,6 +184,58 @@ export default function SkillsPage() {
         }
     }
 
+    const handleKbTableKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Enter" && kbTableInput().trim()) {
+            e.preventDefault()
+            const newTable = kbTableInput().trim()
+            if (!kbTables().includes(newTable)) {
+                setKbTables([...kbTables(), newTable])
+            }
+            setKbTableInput("")
+        }
+    }
+
+    const handleKbTableRemove = (tableToRemove: string) => {
+        setKbTables(kbTables().filter(t => t !== tableToRemove))
+    }
+
+    const handleKbSubmit = () => {
+        if (kbTables().length === 0) {
+            showToast({
+                title: language.t("common.requestFailed"),
+                description: language.t("skills.kb.form.tables.empty"),
+                variant: "error"
+            })
+            return
+        }
+
+        const dir = currentDir()
+        if (!dir) return
+
+
+
+        const promptString = language.t("skills.kb.creator.prompt", {
+            engine: kbEngine(),
+            cluster: kbCluster(),
+            tables: kbTables().join(", "),
+            catalog: kbCatalog(),
+            purpose: kbPurpose()
+        }) + "\n"
+        sessionStorage.setItem("opencode.handoff.prompt", promptString)
+
+        const href = `/${base64Encode(dir)}/session`
+        navigate(href)
+
+        console.log({
+            engine: kbEngine(),
+            cluster: kbCluster(),
+            tables: kbTables(),
+            catalog: kbCatalog(),
+            purpose: kbPurpose()
+        })
+        setKbModalOpen(false)
+    }
+
     const handleDownload = async (e: Event, skill: any) => {
         e.stopPropagation()
         const dir = currentDir()
@@ -247,6 +308,9 @@ export default function SkillsPage() {
                                 {language.t("skills.refresh")}
                             </div>
                         </Button>
+                        <Button variant="secondary" onClick={() => setKbModalOpen(true)}>
+                            {language.t("skills.kb.create")}
+                        </Button>
                         <Button variant="primary" onClick={handleCreate}>
                             {language.t("skills.create")}
                         </Button>
@@ -275,7 +339,7 @@ export default function SkillsPage() {
                                     <div class="group flex flex-col gap-2 p-4 rounded-lg border border-border-weak-base bg-surface-base hover:bg-surface-base-hover transition-colors">
                                         <div class="flex items-center justify-between gap-2">
                                             <div class="flex items-center gap-2">
-                                                <Icon name="mcp" class="size-5 text-icon-base" />
+                                                <Icon name="knowledge-base" class="size-5 text-icon-base" />
                                                 <span class="text-16-medium text-text-strong">{skill.name}</span>
                                             </div>
                                             <div class="flex items-center gap-1">
@@ -319,7 +383,7 @@ export default function SkillsPage() {
                             </For>
                             <Show when={skills()?.length === 0}>
                                 <div class="col-span-full flex flex-col items-center justify-center p-12 text-text-weak">
-                                    <Icon name="mcp" class="size-12 mb-4 opacity-50" />
+                                    <Icon name="knowledge-base" class="size-12 mb-4 opacity-50" />
                                     <p>{language.t("skills.empty")}</p>
                                 </div>
                             </Show>
@@ -335,7 +399,7 @@ export default function SkillsPage() {
                                     <div class="group flex flex-col gap-2 p-4 rounded-lg border border-border-weak-base bg-surface-base hover:bg-surface-base-hover transition-colors">
                                         <div class="flex items-center justify-between gap-2">
                                             <div class="flex items-center gap-2">
-                                                <Icon name="mcp" class="size-5 text-icon-base" />
+                                                <Icon name="knowledge-base" class="size-5 text-icon-base" />
                                                 <span class="text-16-medium text-text-strong">{skill.name}</span>
                                             </div>
                                             <div class="flex items-center gap-2">
@@ -373,7 +437,7 @@ export default function SkillsPage() {
                             </For>
                             <Show when={hubSkills()?.length === 0}>
                                 <div class="col-span-full flex flex-col items-center justify-center p-12 text-text-weak">
-                                    <Icon name="mcp" class="size-12 mb-4 opacity-50" />
+                                    <Icon name="knowledge-base" class="size-12 mb-4 opacity-50" />
                                     <p>No skills in Hub yet.</p>
                                 </div>
                             </Show>
@@ -385,10 +449,10 @@ export default function SkillsPage() {
             {/* Upload Modal */}
             <Show when={uploadModalOpen()}>
                 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm shadow-xl" onClick={() => setUploadModalOpen(false)}>
-                    <div class="w-full max-w-md bg-background-base rounded-xl border border-border-weak-base shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+                    <div class="w-full max-w-md bg-background-base rounded-xl border border-border-weak-base shadow-md p-6" onClick={(e) => e.stopPropagation()}>
                         <div class="flex items-center gap-3 mb-6 border-b border-border-weak-base pb-4">
                             <div class="flex items-center justify-center size-10 rounded-full bg-element-base text-icon-base shadow-sm">
-                                <Icon name="mcp" class="size-5" />
+                                <Icon name="knowledge-base" class="size-5" />
                             </div>
                             <div>
                                 <h2 class="text-16-medium text-text-strong">{language.t("skills.upload.title", { name: selectedSkill()?.name })}</h2>
@@ -419,6 +483,124 @@ export default function SkillsPage() {
                             </Button>
                             <Button variant="primary" onClick={handleUpload} disabled={isUploading()}>
                                 {isUploading() ? language.t("skills.upload.uploading") : language.t("skills.upload.submit")}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
+
+            <Show when={kbModalOpen()}>
+                <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm shadow-xl" onClick={() => setKbModalOpen(false)}>
+                    <div class="w-full max-w-lg bg-background-base rounded-xl border border-border-weak-base shadow-md p-6" onClick={(e) => e.stopPropagation()}>
+                        <div class="flex items-center justify-between mb-6 border-b border-border-weak-base pb-4">
+                            <h2 class="text-16-medium text-text-strong">{language.t("skills.kb.form.title")}</h2>
+                            <IconButton
+                                icon="close"
+                                variant="ghost"
+                                size="small"
+                                class="text-text-weak hover:text-text-strong transition-colors"
+                                onClick={() => setKbModalOpen(false)}
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-4 mb-6">
+                            <div>
+                                <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.catalog")}</label>
+                                <div class="flex flex-wrap gap-2">
+                                    {["AIK", "会员", "长音频", "规模", "直播"].map((cat) => (
+                                        <button
+                                            class={`px-4 py-2 rounded-lg text-14-medium border transition-all ${kbCatalog() === cat
+                                                ? "bg-element-active border-element-active text-text-strong shadow-sm"
+                                                : "bg-surface-base border-border-weak-base text-text-base hover:border-element-active hover:text-text-strong"
+                                                }`}
+                                            onClick={() => setKbCatalog(cat)}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.purpose")}</label>
+                                <textarea
+                                    class="w-full h-20 px-3 py-2 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none resize-none select-text"
+                                    placeholder={language.t("skills.kb.form.purpose.placeholder")}
+                                    value={kbPurpose()}
+                                    onInput={(e) => setKbPurpose(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.engine")}</label>
+                                <select
+                                    class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none"
+                                    value={kbEngine()}
+                                    onChange={(e) => setKbEngine(e.target.value)}
+                                >
+                                    <option value="presto">{language.t("skills.kb.form.engine.presto")}</option>
+                                    <option value="clickhouse">{language.t("skills.kb.form.engine.clickhouse")}</option>
+                                    <option value="starrocks">{language.t("skills.kb.form.engine.starrocks")}</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.cluster")}</label>
+                                <select
+                                    class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none"
+                                    value={kbCluster()}
+                                    onChange={(e) => setKbCluster(e.target.value)}
+                                >
+                                    <option value="bi-cloud">{language.t("skills.kb.form.cluster.bi-cloud")}</option>
+                                    <option value="quku">{language.t("skills.kb.form.cluster.quku")}</option>
+                                    <option value="newsong">{language.t("skills.kb.form.cluster.newsong")}</option>
+                                    <option value="bi-ssc">{language.t("skills.kb.form.cluster.bi-ssc")}</option>
+                                    <option value="recommend">{language.t("skills.kb.form.cluster.recommend")}</option>
+                                    <option value="olap">{language.t("skills.kb.form.cluster.olap")}</option>
+                                    <option value="realtime">{language.t("skills.kb.form.cluster.realtime")}</option>
+                                    <option value="fx">{language.t("skills.kb.form.cluster.fx")}</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.tables")}</label>
+                                <div class="flex flex-col gap-2">
+                                    <input
+                                        type="text"
+                                        class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none"
+                                        placeholder={language.t("skills.kb.form.tables.placeholder")}
+                                        value={kbTableInput()}
+                                        onInput={(e) => setKbTableInput(e.target.value)}
+                                        onKeyDown={handleKbTableKeyDown}
+                                    />
+                                    <Show when={kbTables().length > 0}>
+                                        <div class="flex flex-wrap gap-2 mt-2">
+                                            <For each={kbTables()}>
+                                                {(table) => (
+                                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-element-base text-text-strong text-12-medium rounded-md">
+                                                        {table}
+                                                        <IconButton
+                                                            icon="close"
+                                                            size="small"
+                                                            variant="ghost"
+                                                            class="!size-4 !min-w-4 text-text-weak hover:text-text-strong"
+                                                            onClick={() => handleKbTableRemove(table)}
+                                                        />
+                                                    </span>
+                                                )}
+                                            </For>
+                                        </div>
+                                    </Show>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-border-weak-base">
+                            <Button variant="ghost" onClick={() => setKbModalOpen(false)}>
+                                {language.t("common.cancel")}
+                            </Button>
+                            <Button variant="primary" onClick={handleKbSubmit}>
+                                {language.t("common.submit")}
                             </Button>
                         </div>
                     </div>

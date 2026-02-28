@@ -96,7 +96,7 @@ export const SidebarContent = (props: {
           </Tooltip>
           <Tooltip placement={placement()} value={props.skillsLabel()}>
             <IconButton
-              icon="mcp"
+              icon="knowledge-base"
               variant="ghost"
               size="large"
               onClick={props.onOpenSkills}
