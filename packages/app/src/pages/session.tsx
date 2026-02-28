@@ -984,15 +984,44 @@ export default function Page() {
   onMount(() => {
     if (prompt.ready()) {
       const value = sessionStorage.getItem("opencode.handoff.prompt")
+      const action = sessionStorage.getItem("opencode.handoff.action")
+      const fileHandoff = sessionStorage.getItem("opencode.handoff.file")
+
       if (value) {
         sessionStorage.removeItem("opencode.handoff.prompt")
-        prompt.set([{ type: "text", content: value, start: 0, end: value.length }], value.length)
+
+        if (action === "edit-skill" && fileHandoff) {
+          // Pass the specific file part so it has syntax highlighting
+          prompt.set([{ type: "file", path: value.replace("@", ""), content: value, start: 0, end: value.length }], value.length)
+        } else {
+          prompt.set([{ type: "text", content: value, start: 0, end: value.length }], value.length)
+        }
+
         focusInput()
         if (inputRef) {
           requestAnimationFrame(() => {
             setCursorPosition(inputRef, value.length)
           })
         }
+      }
+
+      if (action === "edit-skill" && fileHandoff) {
+        sessionStorage.removeItem("opencode.handoff.action")
+        sessionStorage.removeItem("opencode.handoff.file")
+
+        layout.fileTree.open()
+        layout.fileTree.setTab("all")
+
+        // Expand all parent directories
+        const parts = fileHandoff.split("/")
+        let currentPath = ""
+        for (let i = 0; i < parts.length - 1; i++) {
+          currentPath += (i === 0 ? "" : "/") + parts[i]
+          file.tree.expand(currentPath)
+        }
+
+        // open file
+        tabs().open(file.tab(fileHandoff))
       }
     }
 

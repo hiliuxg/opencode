@@ -78,8 +78,10 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        const promptString = `@${skill.location}/ `
+        const promptString = `@${skill.location.replace((dir + "/"), "")} `
         sessionStorage.setItem("opencode.handoff.prompt", promptString)
+        sessionStorage.setItem("opencode.handoff.action", "edit-skill")
+        sessionStorage.setItem("opencode.handoff.file", skill.location)
 
         const href = `/${base64Encode(dir)}/session`
         navigate(href)
@@ -212,8 +214,6 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-
-
         const promptString = language.t("skills.kb.creator.prompt", {
             engine: kbEngine(),
             cluster: kbCluster(),
@@ -226,13 +226,6 @@ export default function SkillsPage() {
         const href = `/${base64Encode(dir)}/session`
         navigate(href)
 
-        console.log({
-            engine: kbEngine(),
-            cluster: kbCluster(),
-            tables: kbTables(),
-            catalog: kbCatalog(),
-            purpose: kbPurpose()
-        })
         setKbModalOpen(false)
     }
 
