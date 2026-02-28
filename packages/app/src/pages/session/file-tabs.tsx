@@ -16,6 +16,8 @@ import { useComments } from "@/context/comments"
 import { useLanguage } from "@/context/language"
 import { usePrompt } from "@/context/prompt"
 import { getSessionHandoff } from "@/pages/session/handoff"
+import { MonacoEditor } from "@/components/monaco-editor"
+import { useGlobalSDK } from "@/context/global-sdk"
 
 const formatCommentLabel = (range: SelectedLineRange) => {
   const start = Math.min(range.start, range.end)
@@ -32,6 +34,7 @@ export function FileTabContent(props: { tab: string }) {
   const language = useLanguage()
   const prompt = usePrompt()
   const codeComponent = useCodeComponent()
+  const globalSdk = useGlobalSDK()
 
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
   const tabs = createMemo(() => layout.tabs(sessionKey))
@@ -434,7 +437,7 @@ export function FileTabContent(props: { tab: string }) {
           contents: source,
           cacheKey: cacheKey(),
         }}
-        enableLineSelection
+        enableLineSelection={false}
         selectedLines={selectedLines()}
         commentedLines={commentedLines()}
         onRendered={() => {
@@ -555,7 +558,37 @@ export function FileTabContent(props: { tab: string }) {
               </div>
             </div>
           </Match>
-          <Match when={state()?.loaded}>{renderCode(contents(), "pb-40")}</Match>
+          <Match when={state()?.loaded}>
+            <div class="h-full" style={{ "min-height": "calc(100vh - 150px)" }}>
+              <MonacoEditor
+                value={contents()}
+                filePath={path() ?? ""}
+                class="h-full"
+                onSave={async (value, source) => {
+                  const p = path()
+                  if (!p) return
+                  try {
+                    await globalSdk.client.file.write({
+                      path: p,
+                      content: value,
+                      directory: decode64(params.dir),
+                    })
+                    if (source === "shortcut") {
+                      showToast({
+                        variant: "success",
+                        title: language.t("toast.file.saved.title"),
+                      })
+                    }
+                  } catch (err) {
+                    showToast({
+                      variant: "error",
+                      title: language.t("toast.file.saveFailed.title"),
+                    })
+                  }
+                }}
+              />
+            </div>
+          </Match>
           <Match when={state()?.loading}>
             <div class="px-6 py-4 text-text-weak">{language.t("common.loading")}...</div>
           </Match>

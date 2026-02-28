@@ -83,6 +83,14 @@ export type EventLspUpdated = {
   }
 }
 
+export type EventFileWatcherUpdated = {
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
+  }
+}
+
 export type EventFileEdited = {
   type: "file.edited"
   properties: {
@@ -684,14 +692,6 @@ export type EventSessionCompacted = {
   }
 }
 
-export type EventFileWatcherUpdated = {
-  type: "file.watcher.updated"
-  properties: {
-    file: string
-    event: "add" | "change" | "unlink"
-  }
-}
-
 export type Todo = {
   /**
    * Brief description of the task
@@ -950,6 +950,7 @@ export type Event =
   | EventGlobalDisposed
   | EventLspClientDiagnostics
   | EventLspUpdated
+  | EventFileWatcherUpdated
   | EventFileEdited
   | EventMessageUpdated
   | EventMessageRemoved
@@ -964,7 +965,6 @@ export type Event =
   | EventQuestionReplied
   | EventQuestionRejected
   | EventSessionCompacted
-  | EventFileWatcherUpdated
   | EventTodoUpdated
   | EventTuiPromptAppend
   | EventTuiCommandExecute
@@ -4021,6 +4021,25 @@ export type FileReadResponses = {
 }
 
 export type FileReadResponse = FileReadResponses[keyof FileReadResponses]
+
+export type FileWriteData = {
+  body?: {
+    content: string
+  }
+  path?: never
+  query: {
+    directory?: string
+    path: string
+  }
+  url: "/file/content"
+}
+
+export type FileWriteResponses = {
+  /**
+   * Success
+   */
+  200: unknown
+}
 
 export type FileStatusData = {
   body?: never

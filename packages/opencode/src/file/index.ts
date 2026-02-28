@@ -11,6 +11,8 @@ import { Instance } from "../project/instance"
 import { Ripgrep } from "./ripgrep"
 import fuzzysort from "fuzzysort"
 import { Global } from "../global"
+import { Bus } from "../bus"
+import { FileWatcher } from "./watcher"
 
 export namespace File {
   const log = Log.create({ service: "file" })
@@ -552,6 +554,23 @@ export namespace File {
       }
     }
     return { type: "text", content }
+  }
+
+  export async function write(file: string, content: string): Promise<void> {
+    const full = path.join(Instance.directory, file)
+
+    if (!Instance.containsPath(full)) {
+      throw new Error(`Access denied: path escapes project directory`)
+    }
+
+    await Filesystem.write(full, content)
+
+    // Notify bus that file has been edited so watcher can update state
+    await Bus.publish(Event.Edited, { file: full })
+    await Bus.publish(FileWatcher.Event.Updated, {
+      file: full,
+      event: "change",
+    })
   }
 
   export async function list(dir?: string) {
