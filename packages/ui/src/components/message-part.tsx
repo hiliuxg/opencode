@@ -1950,7 +1950,7 @@ ToolRegistry.register({
         icon={info().icon}
         trigger={{
           title: i18n.t("ui.tool.mcp.run_query"),
-          subtitle: `${props.input.engine}-${props.input.cluster}`,
+          subtitle: `${props.input.engine}-${props.input.cluster} by ${props.input.account}`,
         }}
       >
         <div data-component="mcp-tool-content">

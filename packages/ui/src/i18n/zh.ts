@@ -18,12 +18,12 @@ export const dict = {
   "ui.sessionReview.largeDiff.meta": "限制：{{limit}} 行变更。当前：{{current}} 行变更。",
   "ui.sessionReview.largeDiff.renderAnyway": "仍然渲染",
 
-  "ui.lineComment.label.prefix": "评论 ",
+  "ui.lineComment.label.prefix": "修改 ",
   "ui.lineComment.label.suffix": "",
-  "ui.lineComment.editorLabel.prefix": "正在评论 ",
+  "ui.lineComment.editorLabel.prefix": "正在修改 ",
   "ui.lineComment.editorLabel.suffix": "",
-  "ui.lineComment.placeholder": "添加评论",
-  "ui.lineComment.submit": "评论",
+  "ui.lineComment.placeholder": "你想怎么改...",
+  "ui.lineComment.submit": "提交",
 
   "ui.sessionTurn.steps.show": "显示步骤",
   "ui.sessionTurn.steps.hide": "隐藏步骤",
