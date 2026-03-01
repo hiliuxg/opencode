@@ -175,3 +175,16 @@ export async function getSkills(params?: {
 export async function getAdminConfig(): Promise<{ skillSyncScript: string }> {
     return request("/health")
 }
+
+export interface GuidedTopic {
+    id: number
+    skillname: string
+    question: string
+    createdAt: string
+}
+
+export async function getGuidedTopics(skillname: string, limit = 3): Promise<GuidedTopic[]> {
+    const sp = new URLSearchParams({ skillname, limit: String(limit) })
+    const res = await request<ApiResponse<GuidedTopic>>(`/api/topics?${sp.toString()}`)
+    return res.items || []
+}

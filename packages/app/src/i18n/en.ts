@@ -579,6 +579,8 @@ export const dict = {
   "session.new.worktree.mainWithBranch": "Main branch ({{branch}})",
   "session.new.worktree.create": "Create new worktree",
   "session.new.lastModified": "Last modified",
+  "session.new.guidedTopics.label": "Suggested Topics",
+  "session.new.guidedTopics.loading": "Loading topics...",
 
   "session.header.search.placeholder": "Search {{project}}",
   "session.header.searchFiles": "Search files",

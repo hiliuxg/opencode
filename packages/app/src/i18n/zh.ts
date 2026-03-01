@@ -574,6 +574,8 @@ export const dict = {
   "session.new.worktree.mainWithBranch": "主分支（{{branch}}）",
   "session.new.worktree.create": "创建新的 worktree",
   "session.new.lastModified": "最后修改",
+  "session.new.guidedTopics.label": "推荐话题",
+  "session.new.guidedTopics.loading": "话题加载中...",
   "session.header.search.placeholder": "搜索 {{project}}",
   "session.header.searchFiles": "搜索文件",
   "session.header.openIn": "打开方式",

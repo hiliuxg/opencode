@@ -91,3 +91,11 @@ export const dataReports = mysqlTable("data_reports", {
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 })
+
+export const guidedTopics = mysqlTable("guided_topics", {
+    id: serial("id").primaryKey(),
+    skillname: varchar("skillname", { length: 255 }).notNull(),
+    question: text("question").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+})

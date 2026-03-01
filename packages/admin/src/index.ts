@@ -3,6 +3,7 @@ import { hideBin } from "yargs/helpers"
 import { Config } from "./config"
 import { cronEngine } from "./cron/engine"
 import { executor } from "./cron/executor"
+import { startGuidedTopicsCron } from "./cron/topics"
 import { createApp } from "./server/server"
 import { Log } from "./util/log"
 
@@ -53,6 +54,9 @@ async function main() {
         log.info(`[admin] cron triggered job=${jobId}`)
         executor.enqueue(jobId)
     })
+
+    // 3. Start guided topics cron job (nightly at 3AM)
+    startGuidedTopicsCron()
 
     // 3. Start HTTP server
     const app = createApp(Config)

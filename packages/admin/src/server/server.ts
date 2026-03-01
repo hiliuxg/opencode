@@ -8,6 +8,7 @@ import { CronRoutes } from "./routes/cron"
 import { HealthRoutes } from "./routes/health"
 import { ExecutionRoutes } from "./routes/execution"
 import { SkillsRoutes } from "./routes/skills"
+import { TopicsRoutes } from "./routes/topics"
 
 import { Log } from "../util/log"
 
@@ -42,6 +43,7 @@ export function createApp(config: typeof Config = Config) {
     app.route(`${bp}/api/jobs`, CronRoutes())
     app.route(`${bp}/api/executions`, ExecutionRoutes())
     app.route(`${bp}/api/skills`, SkillsRoutes())
+    app.route(`${bp}/api/topics`, TopicsRoutes())
 
     // TODO: app.route(`${bp}/api/users`, UserRoutes())
 

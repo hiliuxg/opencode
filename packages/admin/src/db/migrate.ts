@@ -15,6 +15,7 @@ export async function runMigrations() {
   log.info("[migrate] dropping existing tables...")
   await db.execute(sql.raw(`SET FOREIGN_KEY_CHECKS = 0;`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS data_reports`))
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS guided_topics`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS docker_containers`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS configs`))
   await db.execute(sql.raw(`DROP TABLE IF EXISTS cron_executions`))
@@ -127,6 +128,16 @@ export async function runMigrations() {
       content         TEXT,
       result          TEXT,
       user_id         INT,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `))
+
+  await db.execute(sql.raw(`
+    CREATE TABLE guided_topics (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      skillname       VARCHAR(255) NOT NULL,
+      question        TEXT NOT NULL,
       created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
