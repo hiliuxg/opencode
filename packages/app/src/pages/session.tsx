@@ -1128,6 +1128,13 @@ export default function Page() {
                     layout.projects.open(target)
                     navigate(`/${base64Encode(target)}/session`)
                   }}
+                  onTopicClick={(question) => {
+                    prompt.set([{ type: "text", content: question, start: 0, end: question.length }], question.length)
+                    requestAnimationFrame(() => {
+                      const btn = document.querySelector<HTMLButtonElement>('[data-action="prompt-submit"]')
+                      btn?.click()
+                    })
+                  }}
                 />
               </Match>
             </Switch>
