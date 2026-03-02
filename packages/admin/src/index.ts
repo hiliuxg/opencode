@@ -32,6 +32,8 @@ async function main() {
             description: "Base path",
             default: Config.basepath,
         })
+        .help()
+        .alias("h", "help")
         .parse()
 
     await Log.init({

@@ -38,7 +38,8 @@ async function build() {
         console.log(`Building ${executableName} for ${target.os}-${target.arch}...`)
 
         try {
-            await $`bun build ./src/index.ts --compile --target=bun-${target.os}-${target.arch} --outfile=${outPath}`
+            const targetString = target.os === "linux" ? `bun-linux-${target.arch}-musl` : `bun-${target.os}-${target.arch}`
+            await $`bun build ./src/index.ts --compile --target=${targetString} --outfile=${outPath}`
             console.log(`✅ Successfully built ${executableName}`)
         } catch (error) {
             console.error(`❌ Failed to build ${executableName}:`, error)

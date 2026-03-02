@@ -1,127 +1,118 @@
 # OpenCode Admin
 
-OpenCode Admin 是一个用于集中管理多个 OpenCode 实例定时任务的服务。它利用 `croner` 提供秒级精度的定时调度，并通过 API 远程触发 `opencode serve` 实例执行任务。
+OpenCode 管理后台系统。
 
-## 核心特性
+## 环境配置
 
-- **集中式调度**：统一管理所有用户的 Cron 任务，无需每个用户容器常驻后台。
-- **SQLite 存储**：使用 Drizzle ORM + Bun SQLite，轻量级且高性能。
-- **Executor 机制**：自动为每个触发的任务创建会话并发送 `prompt_async`。
-- **模型支持**：支持在任务配置中指定 `providerID` 和 `modelID`（例如 `kimi-2.5`）。
-- **工作区透明**：自动通过 `x-opencode-directory` 传递用户的 workspace 路径。
+在运行项目之前，请确保设置了必要的环境变量（或使用默认值）：
 
----
+| 变量名 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `MYSQL_HOST` | `localhost` | 数据库主机地址 |
+| `MYSQL_PORT` | `3306` | 数据库端口 |
+| `MYSQL_USER` | `root` | 数据库用户名 |
+| `MYSQL_PASSWORD` | `password` | 数据库密码 |
+| `MYSQL_DATABASE` | `admin_db` | 数据库名 |
 
-## 快速开始
+## 开发环境启动
 
-### 本地开发
+本项目使用 [Bun](https://bun.sh/) 作为运行时和包管理器。
 
 1. **安装依赖**
    ```bash
-   cd packages/admin
    bun install
    ```
 
-2. **启动服务**
+2. **启动开发服务器**
+   该命令会利用 `concurrently` 同时启动后端 (Bun) 和前端 (Vite)。
    ```bash
-   bun run dev
+   bun dev
    ```
-   默认监听 `http://localhost:8787`。
+   - **后端**: `http://localhost:8787`
+   - **前端**: `http://localhost:5173`
 
-### 环境变量
+3. **单独启动**
+   - 仅启动后端：`bun run dev:backend`
+   - 仅启动前端：`bun run dev:frontend`
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `ADMIN_PORT` | 服务监听端口 | `8787` |
-| `ADMIN_HOST` | 服务监听地址 | `0.0.0.0` |
-| `DATABASE_PATH` | SQLite 数据库文件路径 | `~/.config/opencode-admin/admin.db` |
+## Docker 线上打包与部署
 
----
+我们推荐使用 Docker 进行容器化部署。
 
-## API 接口文档
-
-### 健康检查
-`GET /health`
-- 返回服务运行时间和调度任务总数。
-
-### Cron 任务管理 (`/api/jobs`)
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/` | 获取所有任务。支持 `?userId=xxx` 过滤。 |
-| `GET` | `/:id` | 获取单个任务详情（含下次执行时间 `nextRun`）。 |
-| `POST` | `/` | 创建新任务。 |
-| `PUT` | `/:id` | 更新任务信息（如 Cron 表达式、Prompt、配置）。 |
-| `DELETE` | `/:id` | 删除任务并停止调度。 |
-| `PATCH` | `/:id/toggle` | 启用/禁用任务。 |
-| `POST` | `/:id/run` | 立即手动触发一次执行。 |
-
-### 执行记录 (`/api/executions`)
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/` | 获取执行历史。支持 `?jobId=xxx&limit=20&offset=0`。 |
-| `GET` | `/:id` | 获取单次执行详情（状态、错误信息、持续时间等）。 |
-
-#### 创建任务示例 (POST `/api/jobs`)
-```json
-{
-  "userId": "leoliu",
-  "name": "每日代码审查",
-  "cronExpression": "0 9 * * *",
-  "timezone": "Asia/Shanghai",
-  "prompt": "请检查 /Users/leoliu/mycode/project 下昨天的提交并汇总",
-  "config": {
-    "providerID": "kimi",
-    "modelID": "kimi-2.5"
-  }
-}
+### 1. 准备工作
+确保你已经执行了本地构建，产出了 `bin` 目录下的后端二进制文件（该脚本已配置为输出适配 Alpine 的 `musl` 版本）：
+```bash
+bun run build
 ```
 
----
+### 2. 构建 Docker 镜像
+在 `packages/admin` 目录下执行构建。
 
-## 线上部署
+- **构建原生平台镜像 (推荐):** 
+  ```bash
+  docker build -t opencode-admin:latest .
+  ```
+- **构建特定平台镜像 (例如针对 CentOS):**
+  ```bash
+  docker build --platform linux/amd64 -t opencode-admin:latest .
+  ```
 
-推荐使用 **Docker** 进行部署，以确保环境一致性。
+### 3. 镜像导出与导入 (跨机器迁移)
+如果你在本地构建，需要将镜像同步到远程服务器（如 CentOS），可以使用 save/load 方式：
 
-### 1. 编写 Dockerfile (参考)
+1. **本地机器：导出镜像为 tar 文件**
+   ```bash
+   docker save -o opencode-admin.tar opencode-admin:latest
+   ```
 
-项目根目录下已准备好基础构建链路，对于 admin 包：
+2. **将文件上传至服务器并导入**
+   ```bash
+   # 上传（示例）
+   scp opencode-admin.tar root@your-server-ip:/root/
+   # 服务器上：载入镜像
+   docker load -i opencode-admin.tar
+   ```
 
-```dockerfile
-FROM oven/bun:1.1 AS base
-WORKDIR /app
+### 4. 使用 Docker 启动 (及环境变量处理)
 
-COPY package.json bun.lockb ./
-COPY packages/admin/package.json ./packages/admin/
-RUN bun install
+启动时通过环境变量传递 MySQL 配置：
 
-COPY packages/admin ./packages/admin
-WORKDIR /app/packages/admin
-
-EXPOSE 8787
-ENTRYPOINT ["bun", "run", "src/index.ts"]
+**方式一：命令行参数 `-e`**
+```bash
+docker run -d \
+  --name opencode-admin \
+  -p 8787:8787 \
+  -e MYSQL_HOST=your_db_host \
+  -e MYSQL_USER=your_db_user \
+  -e MYSQL_PASSWORD=your_db_password \
+  -e MYSQL_DATABASE=admin_db \
+  opencode-admin --basepath starwork
 ```
 
-### 2. Docker Compose 配置
-
-```yaml
-services:
-  opencode-admin:
-    build: 
-      context: ../../
-      dockerfile: ./packages/admin/Dockerfile
-    ports:
-      - "8787:8787"
-    volumes:
-      - ./admin-data:/app/data
-    environment:
-      - DATABASE_PATH=/app/data/admin.db
-      - ADMIN_PORT=8787
-    restart: always
+**方式二：使用 .env 文件**
+```bash
+docker run -d --name opencode-admin -p 8787:8787 --env-file .env opencode-admin
 ```
 
-### 3. 注意事项
-- **网络互通**：确保 Admin 服务能够通过网络访问到 `opencode serve` 所在的容器或主机地址。
-- **持久化**：务必挂载 `/app/data` 目录以保留 SQLite 数据库文件。
-- **安全**：目前 API 为开放状态，线上部署建议在 Nginx 层增加 Basic Auth 或 IP 白名单限制。
+### 4. 数据库初始化
+镜像内不包含数据库。请确保：
+1. 已通过 `bun run db:migrate` 初始化数据库。
+2. 数据库连接信息在上述步骤中已正确注入容器。
+
+## 数据库初始化 (SQL 导入)
+
+数据库基于 MySQL，必须先创建数据库（默认名为 `admin_db`）。
+
+1. **自动初始化/迁移**
+   运行以下命令会自动按照定义删除旧表并重新创建所有表，同时初始化一个默认用户：
+   ```bash
+   bun run db:migrate
+   ```
+
+2. **手动 SQL 导入**
+   如果你需要手动导入 SQL 脚本：
+   - SQL 文件路径: `src/db/init.sql`
+   - 使用命令行导入:
+     ```bash
+     mysql -u <user> -p <database_name> < src/db/init.sql
+     ```
