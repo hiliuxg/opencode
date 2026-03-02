@@ -3,7 +3,7 @@
  * 封装对 OpenCode Admin 定时任务服务的 REST 调用
  */
 
-const DEFAULT_ADMIN_URL = "http://localhost:8787/starwork"
+const DEFAULT_ADMIN_URL = "https://kudata-agent.tmeoa.com/opencode"
 
 export function getAdminUrl(): string {
     try {

@@ -90,9 +90,9 @@ export default function Home() {
           <div class="mt-20 w-full flex flex-col gap-4">
             <div class="flex gap-2 items-center justify-between pl-3">
               <div class="text-14-medium text-text-strong">{language.t("home.recentProjects")}</div>
-              <Button icon="folder-add-left" size="normal" class="pl-2 pr-3" onClick={chooseProject}>
+              {/* <Button icon="folder-add-left" size="normal" class="pl-2 pr-3" onClick={chooseProject}>
                 {language.t("command.project.open")}
-              </Button>
+              </Button> */}
             </div>
             <ul class="flex flex-col gap-2">
               <For each={recent()}>
@@ -120,9 +120,9 @@ export default function Home() {
               <div class="text-14-medium text-text-strong">{language.t("home.empty.title")}</div>
               <div class="text-12-regular text-text-weak">{language.t("home.empty.description")}</div>
             </div>
-            <Button class="px-3 mt-1" onClick={chooseProject}>
+            {/* <Button class="px-3 mt-1" onClick={chooseProject}>
               {language.t("command.project.open")}
-            </Button>
+            </Button> */}
           </div>
         </Match>
       </Switch>

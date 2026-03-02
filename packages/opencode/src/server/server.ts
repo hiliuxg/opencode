@@ -54,7 +54,9 @@ export namespace Server {
     return _url ?? new URL("http://localhost:4096")
   }
 
-  const app = new Hono()
+  const basePath = Flag.OPENCODE_BASE_PATH ? Flag.OPENCODE_BASE_PATH : ""
+  const app = new Hono().basePath(basePath as "/")
+
   export const App: () => Hono = lazy(
     () =>
       // TODO: Break server.ts into smaller route files to fix type inference
@@ -541,9 +543,37 @@ export namespace Server {
           },
         )
         .all("/*", async (c) => {
-          const path = c.req.path
+          let reqPath = c.req.path
+          const basePath = Flag.OPENCODE_BASE_PATH
 
-          const response = await proxy(`https://app.opencode.ai${path}`, {
+          // 如果 basePath 存在，由于 app.basePath() 被调用
+          // 控制器仍会收到包含 basePath 的 c.req.path
+          // 因此需要从 reqPath 中剥离它用于静态文件映射
+          if (basePath && reqPath.startsWith(basePath)) {
+            reqPath = reqPath.slice(basePath.length)
+          }
+
+          if (reqPath === "" || reqPath === "/") reqPath = "/index.html"
+
+          const publicDir = process.env.OPENCODE_STATIC_DIR || "/usr/local/bin/ui"
+          let file = Bun.file(`${publicDir}${reqPath}`)
+          let exists = await file.exists()
+
+          if (!exists && !reqPath.includes(".")) {
+            file = Bun.file(`${publicDir}/index.html`)
+            exists = await file.exists()
+          }
+
+          if (exists) {
+            const response = new Response(file)
+            response.headers.set(
+              "Content-Security-Policy",
+              "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:*",
+            )
+            return response
+          }
+
+          const response = await proxy(`https://app.opencode.ai${c.req.path}`, {
             ...c.req,
             headers: {
               ...c.req.raw.headers,
@@ -552,7 +582,7 @@ export namespace Server {
           })
           response.headers.set(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data:",
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:*",
           )
           return response
         }) as unknown as Hono,
