@@ -1860,7 +1860,7 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
-  name: "kudata-mcp_sql_query_result",
+  name: "kudata-mcp_run_select_query",
   render(props) {
     const i18n = useI18n()
     const codeComponent = useCodeComponent()
@@ -1886,8 +1886,8 @@ ToolRegistry.register({
                   component={codeComponent}
                   file={{
                     name: "input.sql",
-                    contents: props.input.querySql ?? "",
-                    cacheKey: checksum(props.input.querySql ?? ""),
+                    contents: props.input.query ?? "",
+                    cacheKey: checksum(props.input.query ?? ""),
                   }}
                   overflow="scroll"
                 />

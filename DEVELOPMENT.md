@@ -81,3 +81,73 @@ bun dev web
 - **API 定义**: `packages/opencode/src/server/`
 - **前端页面**: `packages/app/`
 - **TUI 界面**: `packages/opencode/src/cli/cmd/tui/`
+
+---
+
+## 6. Docker 部署 (Docker Deployment)
+
+本节介绍如何构建 OpenCode 的 Docker 镜像并在服务器上运行。
+
+### 6.1 打包与构建 (Build & Package)
+
+由于 Dockerfile 采用的是将本地构建产物打包进镜像的策略，因此在构建 Docker 镜像之前，需要先在本地完成编译。
+
+1.  **编译项目产物**：
+    在根目录下执行：
+    ```bash
+    # 使用 Turbo 并行构建所有子包
+    bun x turbo build
+    ```
+    此命令会生成：
+    - 后端二进制文件：位于 `packages/opencode/dist/`
+    - 前端静态资源：位于 `packages/app/dist/`
+
+2.  **构建 Docker 镜像**：
+    ```bash
+    # 构建 amd64 架构镜像
+    docker buildx build --platform linux/amd64 -t opencode:latest --load .
+    ```
+
+### 6.2 导出与导入镜像 (Export & Import)
+
+如果需要在内网环境或不同机器间分发镜像：
+
+1.  **导出镜像文件**：
+    ```bash
+    docker save -o opencode-latest.tar opencode:latest
+    ```
+
+2.  **在目标机器加载镜像**：
+    ```bash
+    sudo docker load -i opencode-latest.tar
+    ```
+
+### 6.3 运行容器 (Running the Container)
+
+推荐使用以下配置运行容器，以确保数据的持久化和环境的适配：
+
+```bash
+docker run -d \
+  --name opencode \
+  -p 4096:4096 \
+  -e OPENCODE_DISABLE_MODELS_FETCH=true \
+  -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
+  -e OPENCODE_DISABLE_LSP_DOWNLOAD=true \
+  -v /data1/opencode:/home \
+  -v /data1/opencode/base/config:/root/.config/opencode \
+  -v /data1/opencode/base/local:/root/.local \
+  opencode:latest \
+  serve --hostname 0.0.0.0 --cors "*" --log-level DEBUG --print-logs
+```
+
+#### 参数详解：
+- **端口映射 (`-p`)**: 将容器内的 `4096` 端口映射到宿主机的 `4096`。
+- **环境变量 (`-e`)**: 
+  - `OPENCODE_DISABLE_MODELS_FETCH`: 禁用模型自动拉取（适用于受限网络）。
+  - `OPENCODE_DISABLE_DEFAULT_PLUGINS`: 禁用默认插件加载。
+  - `OPENCODE_DISABLE_LSP_DOWNLOAD`: 禁用 LSP 自动下载。
+- **卷挂载 (`-v`)**: 
+  - `/home`: 挂载工作目录。
+  - `/root/.config/opencode`: 挂载配置文件目录。
+  - `/root/.local`: 挂载本地缓存及数据目录。
+- **启动参数**: 指定 `serve` 模式运行，监听 `0.0.0.0`，允许所有跨域请求 (`--cors "*"`)。
