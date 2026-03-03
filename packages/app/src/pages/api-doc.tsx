@@ -5,6 +5,8 @@ import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
+import { useParams } from "@solidjs/router"
+import { decode64 } from "@/utils/base64"
 
 // ─── Shared Components ───
 
@@ -239,6 +241,8 @@ function groupEndpoints(paths: Record<string, any>): ApiGroup[] {
 export default function ApiDoc() {
     const language = useLanguage()
     const server = useServer()
+    const params = useParams()
+    const currentDir = () => decode64(params.dir)
 
     const [spec] = createResource(async () => {
         const url = server.current?.http.url
@@ -262,7 +266,7 @@ export default function ApiDoc() {
                 <h1 class="text-20-medium text-text-strong mb-6">{language.t("apiDoc.title")}</h1>
 
                 <Step title={language.t("apiDoc.step1.title")}>
-                    <CodeBlock code={`export OPENCODE_HOST="${server.current?.http.url ?? ""}"\nexport OPENCODE_DIR="/your/workspace/path"`} name="env.sh" />
+                    <CodeBlock code={`export OPENCODE_HOST="${server.current?.http.url ?? ""}"\nexport OPENCODE_DIR="${currentDir() || "/your/workspace/path"}"`} name="env.sh" />
                 </Step>
                 <Step title={language.t("apiDoc.step2.title")}>
                     <CodeBlock
@@ -281,7 +285,7 @@ export default function ApiDoc() {
                 </Step>
                 <Step title={language.t("apiDoc.step4.title")}>
                     <CodeBlock
-                        code={`http://localhost:3000/<dir_base64>/session/<session_id>`}
+                        code={`${server.current?.http.url ?? ""}/${params.dir}/session/<session_id>`}
                         name="url.txt"
                     />
                     <div class="text-12-regular text-text-weak mt-1">

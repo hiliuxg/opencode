@@ -88,6 +88,9 @@ docker run -d \
   -e MYSQL_PORT=3306 \
   -e MYSQL_DATABASE=databot_admin \
   -e SKILL_SYNC_SCRIPT=/root/.config/opencode/skill_sync.sh \
+  -e OPENCODE_HOST=https://kudata-opencode.tmeoa.com \
+  -e OPENCODE_DIR=/home/xiaogenliu \
+  -e GUIDED_TOPIC_SKILLS=skill-creator \
   -v /data1/opencode_dist/admin/storage:/storage/skills \
   opencode-admin --basepath opencode
 ```
