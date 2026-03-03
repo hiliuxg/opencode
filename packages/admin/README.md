@@ -82,11 +82,14 @@ bun run build
 docker run -d \
   --name opencode-admin \
   -p 8787:8787 \
-  -e MYSQL_HOST=your_db_host \
-  -e MYSQL_USER=your_db_user \
-  -e MYSQL_PASSWORD=your_db_password \
-  -e MYSQL_DATABASE=admin_db \
-  opencode-admin --basepath starwork
+  -e MYSQL_HOST=10.5.140.127 \
+  -e MYSQL_USER=root \
+  -e MYSQL_PASSWORD=admin@kugou123 \
+  -e MYSQL_PORT=3306 \
+  -e MYSQL_DATABASE=databot_admin \
+  -e SKILL_SYNC_SCRIPT=/root/.config/opencode/skill_sync.sh \
+  -v /data1/opencode_dist/admin/storage:/storage/skills \
+  opencode-admin --basepath opencode
 ```
 
 **方式二：使用 .env 文件**

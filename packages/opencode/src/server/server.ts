@@ -568,8 +568,11 @@ export namespace Server {
             const response = new Response(file)
             response.headers.set(
               "Content-Security-Policy",
-              "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:*",
+              "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com",
             )
+            response.headers.set("Access-Control-Allow-Origin", "*")
+            response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            response.headers.set("Access-Control-Allow-Headers", "*")
             return response
           }
 
@@ -582,8 +585,11 @@ export namespace Server {
           })
           response.headers.set(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:*",
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com",
           )
+          response.headers.set("Access-Control-Allow-Origin", "*")
+          response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+          response.headers.set("Access-Control-Allow-Headers", "*")
           return response
         }) as unknown as Hono,
   )
