@@ -104,13 +104,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       title: language.t("command.session.new"),
       keybind: "mod+shift+s",
       slash: "new",
-      onSelect: async () => {
-        const dir = sdk.directory
-        if (dir) {
-          await sdk.client.instance.dispose({ directory: dir }).catch(() => undefined)
-        }
-        navigate(`/${params.dir}/session`)
-      },
+      onSelect: () => navigate(`/${params.dir}/session`),
     }),
   ])
 

@@ -1857,11 +1857,7 @@ export default function Layout(props: ParentProps) {
                             size="large"
                             icon="plus-small"
                             class="w-full"
-                            onClick={async () => {
-                              const dir = p().worktree
-                              await globalSDK.client.instance.dispose({ directory: dir }).catch(() => undefined)
-                              navigateWithSidebarReset(`/${base64Encode(dir)}/session`)
-                            }}
+                            onClick={() => navigateWithSidebarReset(`/${base64Encode(p().worktree)}/session`)}
                           >
                             {language.t("command.session.new")}
                           </Button>
