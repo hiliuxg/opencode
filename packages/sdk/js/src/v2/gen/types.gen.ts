@@ -218,13 +218,13 @@ export type AssistantMessage = {
     completed?: number
   }
   error?:
-  | ProviderAuthError
-  | UnknownError
-  | MessageOutputLengthError
-  | MessageAbortedError
-  | StructuredOutputError
-  | ContextOverflowError
-  | ApiError
+    | ProviderAuthError
+    | UnknownError
+    | MessageOutputLengthError
+    | MessageAbortedError
+    | StructuredOutputError
+    | ContextOverflowError
+    | ApiError
   parentID: string
   modelID: string
   providerID: string
@@ -587,17 +587,17 @@ export type EventPermissionReplied = {
 
 export type SessionStatus =
   | {
-    type: "idle"
-  }
+      type: "idle"
+    }
   | {
-    type: "retry"
-    attempt: number
-    message: string
-    next: number
-  }
+      type: "retry"
+      attempt: number
+      message: string
+      next: number
+    }
   | {
-    type: "busy"
-  }
+      type: "busy"
+    }
 
 export type EventSessionStatus = {
   type: "session.status"
@@ -726,23 +726,23 @@ export type EventTuiCommandExecute = {
   type: "tui.command.execute"
   properties: {
     command:
-    | "session.list"
-    | "session.new"
-    | "session.share"
-    | "session.interrupt"
-    | "session.compact"
-    | "session.page.up"
-    | "session.page.down"
-    | "session.line.up"
-    | "session.line.down"
-    | "session.half.page.up"
-    | "session.half.page.down"
-    | "session.first"
-    | "session.last"
-    | "prompt.clear"
-    | "prompt.submit"
-    | "agent.cycle"
-    | string
+      | "session.list"
+      | "session.new"
+      | "session.share"
+      | "session.interrupt"
+      | "session.compact"
+      | "session.page.up"
+      | "session.page.down"
+      | "session.line.up"
+      | "session.line.down"
+      | "session.half.page.up"
+      | "session.half.page.down"
+      | "session.first"
+      | "session.last"
+      | "prompt.clear"
+      | "prompt.submit"
+      | "agent.cycle"
+      | string
   }
 }
 
@@ -870,13 +870,13 @@ export type EventSessionError = {
   properties: {
     sessionID?: string
     error?:
-    | ProviderAuthError
-    | UnknownError
-    | MessageOutputLengthError
-    | MessageAbortedError
-    | StructuredOutputError
-    | ContextOverflowError
-    | ApiError
+      | ProviderAuthError
+      | UnknownError
+      | MessageOutputLengthError
+      | MessageAbortedError
+      | StructuredOutputError
+      | ContextOverflowError
+      | ApiError
   }
 }
 
@@ -1032,26 +1032,26 @@ export type PermissionRuleConfig = PermissionActionConfig | PermissionObjectConf
 
 export type PermissionConfig =
   | {
-    __originalKeys?: Array<string>
-    read?: PermissionRuleConfig
-    edit?: PermissionRuleConfig
-    glob?: PermissionRuleConfig
-    grep?: PermissionRuleConfig
-    list?: PermissionRuleConfig
-    bash?: PermissionRuleConfig
-    task?: PermissionRuleConfig
-    external_directory?: PermissionRuleConfig
-    todowrite?: PermissionActionConfig
-    todoread?: PermissionActionConfig
-    question?: PermissionActionConfig
-    webfetch?: PermissionActionConfig
-    websearch?: PermissionActionConfig
-    codesearch?: PermissionActionConfig
-    lsp?: PermissionRuleConfig
-    doom_loop?: PermissionActionConfig
-    skill?: PermissionRuleConfig
-    [key: string]: PermissionRuleConfig | Array<string> | PermissionActionConfig | undefined
-  }
+      __originalKeys?: Array<string>
+      read?: PermissionRuleConfig
+      edit?: PermissionRuleConfig
+      glob?: PermissionRuleConfig
+      grep?: PermissionRuleConfig
+      list?: PermissionRuleConfig
+      bash?: PermissionRuleConfig
+      task?: PermissionRuleConfig
+      external_directory?: PermissionRuleConfig
+      todowrite?: PermissionActionConfig
+      todoread?: PermissionActionConfig
+      question?: PermissionActionConfig
+      webfetch?: PermissionActionConfig
+      websearch?: PermissionActionConfig
+      codesearch?: PermissionActionConfig
+      lsp?: PermissionRuleConfig
+      doom_loop?: PermissionActionConfig
+      skill?: PermissionRuleConfig
+      [key: string]: PermissionRuleConfig | Array<string> | PermissionActionConfig | undefined
+    }
   | PermissionActionConfig
 
 export type AgentConfig = {
@@ -1096,30 +1096,30 @@ export type AgentConfig = {
   maxSteps?: number
   permission?: PermissionConfig
   [key: string]:
-  | unknown
-  | string
-  | number
-  | {
-    [key: string]: boolean
-  }
-  | boolean
-  | "subagent"
-  | "primary"
-  | "all"
-  | {
-    [key: string]: unknown
-  }
-  | string
-  | "primary"
-  | "secondary"
-  | "accent"
-  | "success"
-  | "warning"
-  | "error"
-  | "info"
-  | number
-  | PermissionConfig
-  | undefined
+    | unknown
+    | string
+    | number
+    | {
+        [key: string]: boolean
+      }
+    | boolean
+    | "subagent"
+    | "primary"
+    | "all"
+    | {
+        [key: string]: unknown
+      }
+    | string
+    | "primary"
+    | "secondary"
+    | "accent"
+    | "success"
+    | "warning"
+    | "error"
+    | "info"
+    | number
+    | PermissionConfig
+    | undefined
 }
 
 export type ProviderConfig = {
@@ -1139,10 +1139,10 @@ export type ProviderConfig = {
       temperature?: boolean
       tool_call?: boolean
       interleaved?:
-      | true
-      | {
-        field: "reasoning_content" | "reasoning_details"
-      }
+        | true
+        | {
+            field: "reasoning_content" | "reasoning_details"
+          }
       cost?: {
         input: number
         output: number
@@ -1390,43 +1390,43 @@ export type Config = {
    */
   mcp?: {
     [key: string]:
-    | McpLocalConfig
-    | McpRemoteConfig
-    | {
-      enabled: boolean
-    }
+      | McpLocalConfig
+      | McpRemoteConfig
+      | {
+          enabled: boolean
+        }
   }
   formatter?:
-  | false
-  | {
-    [key: string]: {
-      disabled?: boolean
-      command?: Array<string>
-      environment?: {
-        [key: string]: string
+    | false
+    | {
+        [key: string]: {
+          disabled?: boolean
+          command?: Array<string>
+          environment?: {
+            [key: string]: string
+          }
+          extensions?: Array<string>
+        }
       }
-      extensions?: Array<string>
-    }
-  }
   lsp?:
-  | false
-  | {
-    [key: string]:
+    | false
     | {
-      disabled: true
-    }
-    | {
-      command: Array<string>
-      extensions?: Array<string>
-      disabled?: boolean
-      env?: {
-        [key: string]: string
+        [key: string]:
+          | {
+              disabled: true
+            }
+          | {
+              command: Array<string>
+              extensions?: Array<string>
+              disabled?: boolean
+              env?: {
+                [key: string]: string
+              }
+              initialization?: {
+                [key: string]: unknown
+              }
+            }
       }
-      initialization?: {
-        [key: string]: unknown
-      }
-    }
-  }
   /**
    * Additional instruction files or patterns to include
    */
@@ -1548,10 +1548,10 @@ export type Model = {
       pdf: boolean
     }
     interleaved:
-    | boolean
-    | {
-      field: "reasoning_content" | "reasoning_details"
-    }
+      | boolean
+      | {
+          field: "reasoning_content" | "reasoning_details"
+        }
   }
   cost: {
     input: number
@@ -3756,10 +3756,10 @@ export type ProviderListResponses = {
           temperature: boolean
           tool_call: boolean
           interleaved?:
-          | true
-          | {
-            field: "reasoning_content" | "reasoning_details"
-          }
+            | true
+            | {
+                field: "reasoning_content" | "reasoning_details"
+              }
           cost?: {
             input: number
             output: number
@@ -4003,6 +4003,27 @@ export type FileListResponses = {
 
 export type FileListResponse = FileListResponses[keyof FileListResponses]
 
+export type FileDeleteData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    path: string
+  }
+  url: "/file/content"
+}
+
+export type FileDeleteResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+  }
+}
+
+export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
+
 export type FileReadData = {
   body?: never
   path?: never
@@ -4059,27 +4080,6 @@ export type FileStatusResponses = {
 
 export type FileStatusResponse = FileStatusResponses[keyof FileStatusResponses]
 
-export type FileDeleteData = {
-  body?: never
-  path?: never
-  query: {
-    directory?: string
-    path: string
-  }
-  url: "/file/content"
-}
-
-export type FileDeleteResponses = {
-  /**
-   * Success
-   */
-  200: {
-    success: true
-  }
-}
-
-export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
-
 export type FileDownloadData = {
   body?: never
   path?: never
@@ -4094,7 +4094,7 @@ export type FileDownloadResponses = {
   /**
    * File content
    */
-  200: Blob
+  200: Blob | File
 }
 
 export type FileDownloadResponse = FileDownloadResponses[keyof FileDownloadResponses]
