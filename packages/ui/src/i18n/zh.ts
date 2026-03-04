@@ -84,6 +84,7 @@ export const dict = {
   "ui.tool.mcp.run_query.input": "查询语句",
   "ui.tool.mcp.run_query.output": "查询结果",
   "ui.tool.mcp.run_query.no_results": "暂无结果",
+  "ui.tool.mcp.get_table_columns": "获取表字段信息",
   "ui.tool.mcp.render_chart": "渲染图表",
   "ui.tool.skill": "加载技能",
 

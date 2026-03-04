@@ -80,6 +80,7 @@ export const dict = {
   "ui.tool.mcp.run_query.input": "Input SQL",
   "ui.tool.mcp.run_query.output": "Output Results",
   "ui.tool.mcp.run_query.no_results": "No results yet.",
+  "ui.tool.mcp.get_table_columns": "Get Table Columns",
   "ui.tool.mcp.render_chart": "Chart",
   "ui.tool.skill": "Skill",
 

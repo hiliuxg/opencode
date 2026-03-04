@@ -152,12 +152,17 @@ export namespace Config {
         }
       }
 
-      deps.push(
-        iife(async () => {
-          const shouldInstall = await needsInstall(dir)
-          if (shouldInstall) await installDependencies(dir)
-        }),
-      )
+      const isGlobalConfig = dir === Global.Path.config || dir === Flag.OPENCODE_CONFIG_DIR
+      if (isGlobalConfig) {
+        deps.push(
+          iife(async () => {
+            const shouldInstall = await needsInstall(dir)
+            if (shouldInstall) await installDependencies(dir)
+          }),
+        )
+      } else {
+        log.info("skipping dependency installation for non-global config dir", { dir })
+      }
 
       result.command = mergeDeep(result.command ?? {}, await loadCommand(dir))
       result.agent = mergeDeep(result.agent, await loadAgent(dir))
@@ -245,6 +250,7 @@ export namespace Config {
   }
 
   export async function installDependencies(dir: string) {
+    log.info("[installDependencies] START - bun install will run", { dir })
     const pkg = path.join(dir, "package.json")
     const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
 
@@ -286,29 +292,42 @@ export namespace Config {
   }
 
   export async function needsInstall(dir: string) {
+    log.info("[needsInstall] checking", { dir })
     // Some config dirs may be read-only.
     // Installing deps there will fail; skip installation in that case.
     const writable = await isWritable(dir)
     if (!writable) {
-      log.debug("config dir is not writable, skipping dependency install", { dir })
+      log.info("[needsInstall] dir not writable, skip install", { dir })
       return false
     }
 
     const nodeModules = path.join(dir, "node_modules")
-    if (!existsSync(nodeModules)) return true
+    if (!existsSync(nodeModules)) {
+      log.info("[needsInstall] node_modules not found, need install", { nodeModules })
+      return true
+    }
+    log.info("[needsInstall] node_modules exists", { nodeModules })
 
     const pkg = path.join(dir, "package.json")
     const pkgExists = await Filesystem.exists(pkg)
-    if (!pkgExists) return true
+    if (!pkgExists) {
+      log.info("[needsInstall] package.json not found, need install", { pkg })
+      return true
+    }
 
     const parsed = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => null)
     const dependencies = parsed?.dependencies ?? {}
     const depVersion = dependencies["@opencode-ai/plugin"]
-    if (!depVersion) return true
+    if (!depVersion) {
+      log.info("[needsInstall] @opencode-ai/plugin not in package.json, need install", { pkg })
+      return true
+    }
 
     const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
+    log.info("[needsInstall] version check", { depVersion, targetVersion, isLocal: Installation.isLocal() })
     if (targetVersion === "latest") {
       const isOutdated = await PackageRegistry.isOutdated("@opencode-ai/plugin", depVersion, dir)
+      log.info("[needsInstall] isLocal mode, isOutdated check result", { isOutdated, depVersion })
       if (!isOutdated) return false
       log.info("Cached version is outdated, proceeding with install", {
         pkg: "@opencode-ai/plugin",
@@ -316,7 +335,11 @@ export namespace Config {
       })
       return true
     }
-    if (depVersion === targetVersion) return false
+    if (depVersion === targetVersion) {
+      log.info("[needsInstall] version matched, skip install", { depVersion, targetVersion })
+      return false
+    }
+    log.info("[needsInstall] version mismatch, need install", { depVersion, targetVersion })
     return true
   }
 
@@ -1197,7 +1220,7 @@ export namespace Config {
           await Filesystem.writeJson(path.join(Global.Path.config, "config.json"), result)
           await fs.unlink(legacy)
         })
-        .catch(() => {})
+        .catch(() => { })
     }
 
     return result
@@ -1238,7 +1261,7 @@ export namespace Config {
       if (!parsed.data.$schema && isFile) {
         parsed.data.$schema = "https://opencode.ai/config.json"
         const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
-        await Bun.write(options.path, updated).catch(() => {})
+        await Bun.write(options.path, updated).catch(() => { })
       }
       const data = parsed.data
       if (data.plugin && isFile) {

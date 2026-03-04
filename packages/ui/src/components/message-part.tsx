@@ -253,6 +253,12 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         icon: "mcp",
         title: i18n.t("ui.tool.mcp.run_query"),
       }
+    case "kudata-mcp_get_table_columns":
+      return {
+        icon: "chart",
+        title: i18n.t("ui.tool.mcp.get_table_columns"),
+        subtitle: input.tablename ? `${input.engine}-${input.cluster} ${input.tablename}` : undefined,
+      }
     case "kudata-mcp_render_chart":
       return {
         icon: "chart",
@@ -1888,6 +1894,71 @@ ToolRegistry.register({
                     name: "input.sql",
                     contents: props.input.query ?? "",
                     cacheKey: checksum(props.input.query ?? ""),
+                  }}
+                  overflow="scroll"
+                />
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="output">
+              <div data-slot="mcp-sql-tabs-content">
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
+                  <Dynamic
+                    component={codeComponent}
+                    file={{
+                      name: "output.json",
+                      contents: props.output!,
+                      cacheKey: checksum(props.output!),
+                    }}
+                    overflow="scroll"
+                  />
+                </Show>
+              </div>
+            </Tabs.Content>
+          </Tabs>
+        </div>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_get_table_columns",
+  render(props) {
+    const i18n = useI18n()
+    const codeComponent = useCodeComponent()
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+
+    const inputContent = createMemo(() => {
+      try {
+        return JSON.stringify(props.input, null, 2)
+      } catch {
+        return String(props.input)
+      }
+    })
+
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: props.input.tablename ? `${props.input.engine}-${props.input.cluster} ${props.input.tablename}` : (info().subtitle || ""),
+        }}
+      >
+        <div data-component="mcp-tool-content">
+          <Tabs defaultValue={props.input ? "input" : "output"}>
+            <Tabs.List>
+              <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.run_query.input")}</Tabs.Trigger>
+              <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.run_query.output")}</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="input">
+              <div data-slot="mcp-sql-tabs-content">
+                <Dynamic
+                  component={codeComponent}
+                  file={{
+                    name: "input.json",
+                    contents: inputContent(),
+                    cacheKey: checksum(inputContent()),
                   }}
                   overflow="scroll"
                 />
