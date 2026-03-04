@@ -83,6 +83,7 @@ export const dict: Record<Keys, string> = {
   "ui.tool.mcp.run_query.input": "Inndata-SQL",
   "ui.tool.mcp.run_query.output": "Resultater",
   "ui.tool.mcp.run_query.no_results": "Ingen resultater ennå.",
+  "ui.tool.mcp.get_table_columns": "Get Table Columns",
   "ui.tool.mcp.render_chart": "Diagram",
   "ui.tool.skill": "Ferdighet",
 
