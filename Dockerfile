@@ -11,6 +11,7 @@ ENV PIP_INDEX_URL=http://mirror.kgidc.cn/root/pypi/+simple/
 ENV PIP_TRUSTED_HOST=mirror.kgidc.cn
 
 RUN apt-get update && apt-get install -y libgcc-s1 libstdc++6 ripgrep curl git && rm -rf /var/lib/apt/lists/*
+RUN pip install PyYAML
 COPY packages/opencode/node_modules /root/.config/opencode/node_modules
 
 FROM base AS build-amd64

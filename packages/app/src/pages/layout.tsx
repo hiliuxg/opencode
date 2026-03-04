@@ -524,6 +524,29 @@ export default function Layout(props: ParentProps) {
     ),
   )
 
+  // 当 URL 中有 dir 参数，但该目录未在项目列表中时（如第一次通过直接链接访问），
+  // 自动将其加入项目列表并加载会话，使侧边栏能正常显示会话列表和新建会话按钮
+  createEffect(
+    on(
+      () => ({ ready: pageReady(), layoutReady: layoutReady(), dir: params.dir, list: layout.projects.list() }),
+      (value) => {
+        if (!value.ready) return
+        if (!value.layoutReady) return
+        if (!value.dir) return
+
+        const directory = decode64(value.dir)
+        if (!directory) return
+
+        const alreadyOpen = value.list.some(
+          (p) => p.worktree === directory || p.sandboxes?.includes(directory),
+        )
+        if (alreadyOpen) return
+
+        layout.projects.open(directory)
+      },
+    ),
+  )
+
   const workspaceName = (directory: string, projectId?: string, branch?: string) => {
     const key = workspaceKey(directory)
     const direct = store.workspaceName[key] ?? store.workspaceName[directory]
