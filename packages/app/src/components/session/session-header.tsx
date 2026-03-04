@@ -15,6 +15,7 @@ import { createEffect, createMemo, For, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import { useCommand } from "@/context/command"
+import { useFile } from "@/context/file"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -136,11 +137,11 @@ function useSessionShare(args: {
   globalSDK: ReturnType<typeof useGlobalSDK>
   currentSession: () =>
     | {
-        id: string
-        share?: {
-          url?: string
-        }
+      id: string
+      share?: {
+        url?: string
       }
+    }
     | undefined
   projectDirectory: () => string
   platform: ReturnType<typeof usePlatform>
@@ -227,6 +228,7 @@ export function SessionHeader() {
   const sync = useSync()
   const platform = usePlatform()
   const language = useLanguage()
+  const file = useFile()
 
   const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
   const project = createMemo(() => {
@@ -247,6 +249,33 @@ export function SessionHeader() {
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
   const view = createMemo(() => layout.view(sessionKey))
   const os = createMemo(() => detectOS(platform))
+
+  const tabs = createMemo(() => layout.tabs(sessionKey))
+  const activeFilePath = createMemo(() => {
+    const activeTab = tabs().active()
+    if (!activeTab) return undefined
+    return file.pathFromTab(activeTab)
+  })
+
+  const downloadFile = () => {
+    const filePath = activeFilePath()
+    if (!filePath) {
+      showToast({
+        variant: "error",
+        title: language.t("session.header.download.noFile"),
+      })
+      return
+    }
+    const directory = projectDirectory()
+    const baseUrl = globalSDK.url
+    const url = `${baseUrl}/file/download?path=${encodeURIComponent(filePath)}&directory=${encodeURIComponent(directory)}`
+    const a = document.createElement("a")
+    a.href = url
+    a.download = ""
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
 
   const [exists, setExists] = createStore<Partial<Record<OpenApp, boolean>>>({
     finder: true,
@@ -610,6 +639,19 @@ export function SessionHeader() {
                 </div>
               </Show>
               <div class="flex items-center gap-1">
+                <Tooltip
+                  value={language.t("session.header.download")}
+                  placement="top"
+                  gutter={8}
+                >
+                  <IconButton
+                    icon="download"
+                    variant="ghost"
+                    class="titlebar-icon w-8 h-6 p-0 box-border"
+                    onClick={downloadFile}
+                    aria-label={language.t("session.header.download")}
+                  />
+                </Tooltip>
                 <div class="hidden md:flex items-center gap-1 shrink-0">
                   <TooltipKeybind
                     title={language.t("command.terminal.toggle")}

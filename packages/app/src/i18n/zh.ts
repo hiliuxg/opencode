@@ -583,6 +583,8 @@ export const dict = {
   "session.header.open.ariaLabel": "在 {{app}} 中打开",
   "session.header.open.menu": "打开选项",
   "session.header.open.copyPath": "复制路径",
+  "session.header.download": "下载文件",
+  "session.header.download.noFile": "请先打开文件",
 
   "status.popover.trigger": "状态",
   "status.popover.ariaLabel": "服务器配置",

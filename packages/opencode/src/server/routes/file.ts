@@ -1,6 +1,8 @@
 import { Hono } from "hono"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
+import fs from "fs"
+import nodePath from "path"
 import { File } from "../../file"
 import { Ripgrep } from "../../file/ripgrep"
 import { LSP } from "../../lsp"
@@ -223,6 +225,79 @@ export const FileRoutes = lazy(() =>
         const body = c.req.valid("json")
         await File.write(query.path, body.content)
         return c.json({ success: true })
+      },
+    )
+    .delete(
+      "/file/content",
+      describeRoute({
+        summary: "Delete file",
+        description: "Delete a specified file from the project.",
+        operationId: "file.delete",
+        responses: {
+          200: {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ success: z.boolean() })),
+              },
+            },
+          },
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          path: z.string(),
+        }),
+      ),
+      async (c) => {
+        const filePath = c.req.valid("query").path
+        const full = nodePath.resolve(Instance.directory, filePath)
+        if (!Instance.containsPath(full)) {
+          return c.json({ error: "Access denied: path escapes project directory" }, 403)
+        }
+        await fs.promises.unlink(full)
+        return c.json({ success: true })
+      },
+    )
+    .get(
+      "/file/download",
+      describeRoute({
+        summary: "Download file",
+        description: "Download a specified file from the project.",
+        operationId: "file.download",
+        responses: {
+          200: {
+            description: "File content",
+            content: {
+              "application/octet-stream": {
+                schema: resolver(z.string()),
+              },
+            },
+          },
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          path: z.string(),
+        }),
+      ),
+      async (c) => {
+        const filePath = c.req.valid("query").path
+        const full = nodePath.resolve(Instance.directory, filePath)
+        if (!Instance.containsPath(full)) {
+          return c.json({ error: "Access denied: path escapes project directory" }, 403)
+        }
+        const file = Bun.file(full)
+        if (!(await file.exists())) {
+          return c.json({ error: "File not found" }, 404)
+        }
+        const filename = nodePath.basename(full)
+        const encoded = encodeURIComponent(filename)
+        c.header("Content-Disposition", `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`)
+        c.header("Content-Type", file.type || "application/octet-stream")
+        return c.body(file.stream())
       },
     ),
 )
