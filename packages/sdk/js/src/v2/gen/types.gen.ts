@@ -4003,6 +4003,27 @@ export type FileListResponses = {
 
 export type FileListResponse = FileListResponses[keyof FileListResponses]
 
+export type FileDeleteData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    path: string
+  }
+  url: "/file/content"
+}
+
+export type FileDeleteResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+  }
+}
+
+export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
+
 export type FileReadData = {
   body?: never
   path?: never
@@ -4058,6 +4079,25 @@ export type FileStatusResponses = {
 }
 
 export type FileStatusResponse = FileStatusResponses[keyof FileStatusResponses]
+
+export type FileDownloadData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    path: string
+  }
+  url: "/file/download"
+}
+
+export type FileDownloadResponses = {
+  /**
+   * File content
+   */
+  200: Blob | File
+}
+
+export type FileDownloadResponse = FileDownloadResponses[keyof FileDownloadResponses]
 
 export type McpStatusData = {
   body?: never

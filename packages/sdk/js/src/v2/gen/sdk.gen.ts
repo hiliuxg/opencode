@@ -26,6 +26,8 @@ import type {
   EventTuiToastShow,
   ExperimentalResourceListResponses,
   ExperimentalSessionListResponses,
+  FileDeleteResponses,
+  FileDownloadResponses,
   FileListResponses,
   FilePartInput,
   FilePartSource,
@@ -2383,6 +2385,36 @@ export class File extends HeyApiClient {
   }
 
   /**
+   * Delete file
+   *
+   * Delete a specified file from the project.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<FileDeleteResponses, unknown, ThrowOnError>({
+      url: "/file/content",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Read file
    *
    * Read the content of a specified file.
@@ -2463,6 +2495,36 @@ export class File extends HeyApiClient {
     const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
     return (options?.client ?? this.client).get<FileStatusResponses, unknown, ThrowOnError>({
       url: "/file/status",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Download file
+   *
+   * Download a specified file from the project.
+   */
+  public download<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FileDownloadResponses, unknown, ThrowOnError>({
+      url: "/file/download",
       ...options,
       ...params,
     })
