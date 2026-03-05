@@ -25,8 +25,8 @@ import {
 } from "@/utils/admin-api"
 
 const DEFAULT_USER_ID = 1
-const DEFAULT_PROVIDER = "bytedance-provider"
-const DEFAULT_MODEL = "kimi-k2.5"
+const DEFAULT_PROVIDER = "kudata-provider"
+const DEFAULT_MODEL = "deepseek-v3.2"
 
 
 

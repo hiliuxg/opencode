@@ -7,11 +7,21 @@
 import { Hono } from "hono"
 import { getDb, schema } from "../../db/client"
 import { eq, and, gte, sql } from "drizzle-orm"
+import { runGuidedTopicsGeneration } from "../../cron/topics"
 
 const { guidedTopics } = schema
 
 export function TopicsRoutes() {
     const app = new Hono()
+
+    // POST /trigger 用于手动触发调度，方便验证
+    app.post("/trigger", async (c) => {
+        // 放后台异步执行，避免请求超时
+        runGuidedTopicsGeneration().catch(err => {
+            console.error("[API] Failed manual topic generation:", err)
+        })
+        return c.json({ ok: true, message: "Guided topics generation manually triggered" })
+    })
 
     // GET /api/topics?skillname=XXX&limit=3
     app.get("/", async (c) => {
