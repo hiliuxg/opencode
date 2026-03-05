@@ -2007,13 +2007,27 @@ function EChartsRenderer(props: { data: string }) {
 
     const option: Record<string, any> = {}
 
-    option.tooltip = {}
+    option.tooltip = { trigger: "axis" }
+
+    if (data.title) {
+      option.title = typeof data.title === "string" ? { text: data.title } : data.title
+    }
 
     option.xAxis = { type: "category", data: data.xAxis || [] }
     option.yAxis = { type: "value" }
-    option.series = (data.series || []).map((s: any) => ({
+
+    const seriesData = Array.isArray(data.series)
+      ? data.series
+      : Object.entries(data.series || {}).map(([name, value]) => ({ name, data: value }))
+
+    const legendData = seriesData.map((s: any) => s.name).filter(Boolean)
+    if (legendData.length > 0) {
+      option.legend = { data: legendData }
+    }
+
+    option.series = seriesData.map((s: any) => ({
       ...s,
-      type: data.type || "bar",
+      type: data.type || s.type || "bar",
     }))
 
     chartInstance.setOption(option)
