@@ -38,7 +38,8 @@ export default function SkillsPage() {
         if (!dir) return []
         try {
             const response = await globalSDK.client.app.skills({ directory: dir })
-            return response.data ?? []
+            const allSkills = response.data ?? []
+            return allSkills.filter((s: any) => s.name !== "ui-ux-pro-max" && s.name !== "skill-creator")
         } catch (e) {
             console.warn("Failed to list skills", e)
             return []

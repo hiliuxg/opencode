@@ -22,9 +22,9 @@ export const SidebarContent = (props: {
   handleDragStart: (event: unknown) => void
   handleDragEnd: () => void
   handleDragOver: (event: DragEvent) => void
-  openProjectLabel: JSX.Element
-  openProjectKeybind: Accessor<string | undefined>
-  onOpenProject: () => void
+  openProjectLabel?: JSX.Element
+  openProjectKeybind?: Accessor<string | undefined>
+  onOpenProject?: () => void
   renderProjectOverlay: () => JSX.Element
   schedulerLabel: Accessor<string>
   onOpenScheduler: () => void
@@ -61,25 +61,27 @@ export const SidebarContent = (props: {
               <SortableProvider ids={props.projects().map((p) => p.worktree)}>
                 <For each={props.projects()}>{(project) => props.renderProject(project)}</For>
               </SortableProvider>
-              <Tooltip
-                placement={placement()}
-                value={
-                  <div class="flex items-center gap-2">
-                    <span>{props.openProjectLabel}</span>
-                    <Show when={!props.mobile && !!props.openProjectKeybind()}>
-                      <span class="text-icon-base text-12-medium">{props.openProjectKeybind()}</span>
-                    </Show>
-                  </div>
-                }
-              >
-                <IconButton
-                  icon="plus"
-                  variant="ghost"
-                  size="large"
-                  onClick={props.onOpenProject}
-                  aria-label={typeof props.openProjectLabel === "string" ? props.openProjectLabel : undefined}
-                />
-              </Tooltip>
+              <Show when={false}>
+                <Tooltip
+                  placement={placement()}
+                  value={
+                    <div class="flex items-center gap-2">
+                      <span>{props.openProjectLabel}</span>
+                      <Show when={!props.mobile && !!props.openProjectKeybind?.()}>
+                        <span class="text-icon-base text-12-medium">{props.openProjectKeybind?.()}</span>
+                      </Show>
+                    </div>
+                  }
+                >
+                  <IconButton
+                    icon="plus"
+                    variant="ghost"
+                    size="large"
+                    onClick={props.onOpenProject}
+                    aria-label={typeof props.openProjectLabel === "string" ? props.openProjectLabel : undefined}
+                  />
+                </Tooltip>
+              </Show>
             </div>
             <DragOverlay>{props.renderProjectOverlay()}</DragOverlay>
           </DragDropProvider>
