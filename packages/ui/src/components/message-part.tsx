@@ -265,6 +265,12 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: i18n.t("ui.tool.mcp.render_chart"),
         subtitle: input.title,
       }
+    case "kudata-mcp_send_message":
+      return {
+        icon: "bubble-5",
+        title: "发送企微消息",
+        subtitle: input.content ? (input.content.length > 30 ? input.content.slice(0, 30) + "..." : input.content) : undefined,
+      }
     case "skill":
       return {
         icon: "brain",
@@ -2060,6 +2066,71 @@ ToolRegistry.register({
         <Show when={props.output} fallback={<div style={{ padding: "12px", color: "var(--color-text-muted)" }}>Loading chart...</div>}>
           {(output) => <EChartsRenderer data={output()} />}
         </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_send_message",
+  render(props) {
+    const i18n = useI18n()
+    const codeComponent = useCodeComponent()
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+
+    const inputContent = createMemo(() => {
+      try {
+        return JSON.stringify(props.input, null, 2)
+      } catch {
+        return String(props.input)
+      }
+    })
+
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: info().subtitle || "",
+        }}
+      >
+        <div data-component="mcp-tool-content">
+          <Tabs defaultValue={props.input ? "input" : "output"}>
+            <Tabs.List>
+              <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.input")}</Tabs.Trigger>
+              <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.output")}</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="input">
+              <div data-slot="mcp-sql-tabs-content">
+                <Dynamic
+                  component={codeComponent}
+                  file={{
+                    name: "input.json",
+                    contents: inputContent(),
+                    cacheKey: checksum(inputContent()),
+                  }}
+                  overflow="scroll"
+                />
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="output">
+              <div data-slot="mcp-sql-tabs-content">
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
+                  <Dynamic
+                    component={codeComponent}
+                    file={{
+                      name: "output.json",
+                      contents: props.output!,
+                      cacheKey: checksum(props.output!),
+                    }}
+                    overflow="scroll"
+                  />
+                </Show>
+              </div>
+            </Tabs.Content>
+          </Tabs>
+        </div>
       </BasicTool>
     )
   },

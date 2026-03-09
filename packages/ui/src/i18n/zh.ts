@@ -81,6 +81,8 @@ export const dict = {
   "ui.tool.questions": "问题",
   "ui.tool.agent": "{{type}} 智能体",
   "ui.tool.mcp.run_query": "执行SQL查询",
+  "ui.tool.mcp.input": "输入参数",
+  "ui.tool.mcp.output": "输出参数",
   "ui.tool.mcp.run_query.input": "查询语句",
   "ui.tool.mcp.run_query.output": "查询结果",
   "ui.tool.mcp.run_query.no_results": "暂无结果",

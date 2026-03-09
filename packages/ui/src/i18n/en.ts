@@ -77,6 +77,8 @@ export const dict = {
   "ui.tool.questions": "Questions",
   "ui.tool.agent": "{{type}} Agent",
   "ui.tool.mcp.run_query": "Run SQL Query",
+  "ui.tool.mcp.input": "Input Parameters",
+  "ui.tool.mcp.output": "Output Parameters",
   "ui.tool.mcp.run_query.input": "Input SQL",
   "ui.tool.mcp.run_query.output": "Output Results",
   "ui.tool.mcp.run_query.no_results": "No results yet.",
