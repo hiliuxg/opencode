@@ -290,6 +290,7 @@ export default function Layout(props: ParentProps) {
         platform.checkUpdate!().then(({ updateAvailable, version }) => {
           if (!updateAvailable) return
           if (toastId !== undefined) return
+          /*
           toastId = showToast({
             persistent: true,
             icon: "download",
@@ -309,6 +310,7 @@ export default function Layout(props: ParentProps) {
               },
             ],
           })
+          */
         })
 
       createEffect(() => {
@@ -386,6 +388,7 @@ export default function Layout(props: ParentProps) {
         if (now - lastAlerted < cooldownMs) return
         alertedAtBySession.set(sessionKey, now)
 
+        /*
         if (e.details.type === "permission.asked") {
           if (settings.sounds.permissionsEnabled()) {
             playSound(soundSrc(settings.sounds.permissions()))
@@ -400,6 +403,7 @@ export default function Layout(props: ParentProps) {
             void platform.notify(title, description, href)
           }
         }
+        */
 
         const currentSession = params.id
         if (directory === currentDir() && props.sessionID === currentSession) return
@@ -407,6 +411,7 @@ export default function Layout(props: ParentProps) {
 
         dismissSessionAlert(sessionKey)
 
+        /*
         const toastId = showToast({
           persistent: true,
           icon,
@@ -424,6 +429,7 @@ export default function Layout(props: ParentProps) {
           ],
         })
         toastBySession.set(sessionKey, toastId)
+        */
       })
       onCleanup(unsub)
 

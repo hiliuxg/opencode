@@ -532,6 +532,7 @@ export default function SkillsPage() {
                                     value={kbEngine()}
                                     onChange={(e) => setKbEngine(e.target.value)}
                                 >
+                                    <option value="presto">{language.t("skills.kb.form.engine.presto")}</option>
                                     <option value="clickhouse">{language.t("skills.kb.form.engine.clickhouse")}</option>
                                     <option value="starrocks">{language.t("skills.kb.form.engine.starrocks")}</option>
                                 </select>
