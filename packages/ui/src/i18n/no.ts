@@ -80,6 +80,8 @@ export const dict: Record<Keys, string> = {
   "ui.tool.questions": "Spørsmål",
   "ui.tool.agent": "{{type}}-agent",
   "ui.tool.mcp.run_query": "Kjør SQL-spørring",
+  "ui.tool.mcp.input": "Inndataparametere",
+  "ui.tool.mcp.output": "Utdataparametere",
   "ui.tool.mcp.run_query.input": "Inndata-SQL",
   "ui.tool.mcp.run_query.output": "Resultater",
   "ui.tool.mcp.run_query.no_results": "Ingen resultater ennå.",
