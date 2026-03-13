@@ -146,6 +146,12 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SkillCloneErrors,
+  SkillCloneResponses,
+  SkillPublishErrors,
+  SkillPublishResponses,
+  SkillPullErrors,
+  SkillPullResponses,
   SubtaskPartInput,
   TextPartInput,
   ToolIdsErrors,
@@ -3306,6 +3312,149 @@ export class App extends HeyApiClient {
   }
 }
 
+export class Skill extends HeyApiClient {
+  /**
+   * Clone skill from git
+   *
+   * Clone a skill repository from a git URL into the .opencode/skills directory.
+   */
+  public clone<ThrowOnError extends boolean = false>(
+    parameters?: {
+      query_directory?: string
+      body_directory?: string
+      name?: string
+      gitUrl?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            {
+              in: "query",
+              key: "query_directory",
+              map: "directory",
+            },
+            {
+              in: "body",
+              key: "body_directory",
+              map: "directory",
+            },
+            { in: "body", key: "name" },
+            { in: "body", key: "gitUrl" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SkillCloneResponses, SkillCloneErrors, ThrowOnError>({
+      url: "/skill/clone",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Pull skill from git
+   *
+   * Pull latest changes for a skill repository, overwriting local modifications.
+   */
+  public pull<ThrowOnError extends boolean = false>(
+    parameters?: {
+      query_directory?: string
+      body_directory?: string
+      name?: string
+      skillDir?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            {
+              in: "query",
+              key: "query_directory",
+              map: "directory",
+            },
+            {
+              in: "body",
+              key: "body_directory",
+              map: "directory",
+            },
+            { in: "body", key: "name" },
+            { in: "body", key: "skillDir" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SkillPullResponses, SkillPullErrors, ThrowOnError>({
+      url: "/skill/pull",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Publish skill to git remote
+   *
+   * Check git status and push local skill changes to the remote repository.
+   */
+  public publish<ThrowOnError extends boolean = false>(
+    parameters?: {
+      query_directory?: string
+      body_directory?: string
+      name?: string
+      skillPath?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            {
+              in: "query",
+              key: "query_directory",
+              map: "directory",
+            },
+            {
+              in: "body",
+              key: "body_directory",
+              map: "directory",
+            },
+            { in: "body", key: "name" },
+            { in: "body", key: "skillPath" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SkillPublishResponses, SkillPublishErrors, ThrowOnError>({
+      url: "/skill/publish",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Lsp extends HeyApiClient {
   /**
    * Get LSP status
@@ -3485,6 +3634,11 @@ export class OpencodeClient extends HeyApiClient {
   private _app?: App
   get app(): App {
     return (this._app ??= new App({ client: this.client }))
+  }
+
+  private _skill?: Skill
+  get skill(): Skill {
+    return (this._skill ??= new Skill({ client: this.client }))
   }
 
   private _lsp?: Lsp

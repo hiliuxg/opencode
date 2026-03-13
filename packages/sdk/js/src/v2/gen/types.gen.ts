@@ -4761,6 +4761,105 @@ export type AppAgentsResponses = {
 
 export type AppAgentsResponse = AppAgentsResponses[keyof AppAgentsResponses]
 
+export type SkillCloneData = {
+  body?: {
+    directory: string
+    name: string
+    gitUrl: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/skill/clone"
+}
+
+export type SkillCloneErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SkillCloneError = SkillCloneErrors[keyof SkillCloneErrors]
+
+export type SkillCloneResponses = {
+  /**
+   * Clone succeeded
+   */
+  200: {
+    ok: boolean
+  }
+}
+
+export type SkillCloneResponse = SkillCloneResponses[keyof SkillCloneResponses]
+
+export type SkillPullData = {
+  body?: {
+    directory: string
+    name: string
+    skillDir: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/skill/pull"
+}
+
+export type SkillPullErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SkillPullError = SkillPullErrors[keyof SkillPullErrors]
+
+export type SkillPullResponses = {
+  /**
+   * Pull succeeded
+   */
+  200: {
+    ok: boolean
+  }
+}
+
+export type SkillPullResponse = SkillPullResponses[keyof SkillPullResponses]
+
+export type SkillPublishData = {
+  body?: {
+    directory: string
+    name: string
+    skillPath: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/skill/publish"
+}
+
+export type SkillPublishErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SkillPublishError = SkillPublishErrors[keyof SkillPublishErrors]
+
+export type SkillPublishResponses = {
+  /**
+   * Publish result
+   */
+  200: {
+    status: "no-git" | "remote-ahead" | "pushed"
+  }
+}
+
+export type SkillPublishResponse = SkillPublishResponses[keyof SkillPublishResponses]
+
 export type AppSkillsData = {
   body?: never
   path?: never
