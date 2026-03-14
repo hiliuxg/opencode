@@ -239,17 +239,15 @@ export function SessionTurn(
       if (!msg) return emptyAssistant
 
       const messages = allMessages() ?? emptyMessages
-      const index = messageIndex()
-      if (index < 0) return emptyAssistant
-
-      const result: AssistantMessage[] = []
-      for (let i = index + 1; i < messages.length; i++) {
-        const item = messages[i]
-        if (!item) continue
-        if (item.role === "user") break
-        if (item.role === "assistant" && item.parentID === msg.id) result.push(item as AssistantMessage)
-      }
-      return result
+      return messages
+        .filter((item): item is AssistantMessage => item.role === "assistant" && item.parentID === msg.id)
+        .slice()
+        .sort((a, b) => {
+          const ta = a.time?.created ?? 0
+          const tb = b.time?.created ?? 0
+          if (ta !== tb) return ta - tb
+          return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+        })
     },
     emptyAssistant,
     { equals: same },
