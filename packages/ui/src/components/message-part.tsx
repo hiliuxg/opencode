@@ -2014,11 +2014,7 @@ function EChartsRenderer(props: { data: string }) {
     const option: Record<string, any> = {}
 
     option.tooltip = { trigger: "axis" }
-
-    if (data.title) {
-      option.title = typeof data.title === "string" ? { text: data.title } : data.title
-    }
-
+ 
     option.xAxis = { type: "category", data: data.xAxis || [] }
     option.yAxis = { type: "value" }
 

@@ -331,6 +331,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV2 {
       }
       hasFinished: boolean
     }> = []
+    const toolCallIndexById = new Map<string, number>()
 
     let finishReason: LanguageModelV2FinishReason = "unknown"
     const usage: {
@@ -514,16 +515,20 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV2 {
                 isActiveReasoning = false
               }
               for (const toolCallDelta of delta.tool_calls) {
-                const index = toolCallDelta.index
+                const index =
+                  toolCallDelta.index ??
+                  (toolCallDelta.id != null ? toolCallIndexById.get(toolCallDelta.id) : undefined) ??
+                  (() => {
+                    const active = toolCalls
+                      .map((toolCall, index) => (toolCall != null && !toolCall.hasFinished ? index : undefined))
+                      .filter((value): value is number => value != null)
+                    if (active.length === 1) {
+                      return active[0]
+                    }
+                    return toolCalls.length
+                  })()
 
                 if (toolCalls[index] == null) {
-                  if (toolCallDelta.id == null) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'id' to be a string.`,
-                    })
-                  }
-
                   if (toolCallDelta.function?.name == null) {
                     throw new InvalidResponseDataError({
                       data: toolCallDelta,
@@ -531,14 +536,16 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV2 {
                     })
                   }
 
+                  const toolCallId = toolCallDelta.id ?? generateId()
+
                   controller.enqueue({
                     type: "tool-input-start",
-                    id: toolCallDelta.id,
+                    id: toolCallId,
                     toolName: toolCallDelta.function.name,
                   })
 
                   toolCalls[index] = {
-                    id: toolCallDelta.id,
+                    id: toolCallId,
                     type: "function",
                     function: {
                       name: toolCallDelta.function.name,
@@ -546,6 +553,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV2 {
                     },
                     hasFinished: false,
                   }
+                  toolCallIndexById.set(toolCallId, index)
 
                   const toolCall = toolCalls[index]
 
@@ -583,6 +591,9 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV2 {
 
                 // existing tool call, merge if not finished
                 const toolCall = toolCalls[index]
+                if (toolCallDelta.id != null) {
+                  toolCallIndexById.set(toolCallDelta.id, index)
+                }
 
                 if (toolCall.hasFinished) {
                   continue
@@ -760,7 +771,7 @@ const createOpenAICompatibleChatChunkSchema = <ERROR_SCHEMA extends z.core.$ZodT
               tool_calls: z
                 .array(
                   z.object({
-                    index: z.number(),
+                    index: z.number().nullish(),
                     id: z.string().nullish(),
                     function: z.object({
                       name: z.string().nullish(),

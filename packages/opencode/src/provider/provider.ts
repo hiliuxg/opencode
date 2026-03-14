@@ -84,6 +84,107 @@ export namespace Provider {
     })
   }
 
+  function normalizeOpenAICompatibleSSE(response: Response) {
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? ""
+    if (!contentType.includes("text/event-stream")) {
+      return response
+    }
+    if (!response.body) {
+      return response
+    }
+
+    const indexById = new Map<string, number>()
+    let nextIndex = 0
+    let lastToolCallIndex: number | undefined
+    let buffer = ""
+    const decoder = new TextDecoder()
+    const encoder = new TextEncoder()
+
+    const patchDataLine = (line: string) => {
+      if (!line.startsWith("data: ")) {
+        return line
+      }
+      const payload = line.slice(6).trim()
+      if (!payload || payload === "[DONE]") {
+        return line
+      }
+      let parsed: any
+      try {
+        parsed = JSON.parse(payload)
+      } catch {
+        return line
+      }
+      if (!Array.isArray(parsed?.choices)) {
+        return line
+      }
+      for (const choice of parsed.choices) {
+        const toolCalls = choice?.delta?.tool_calls
+        if (!Array.isArray(toolCalls)) {
+          continue
+        }
+        for (const toolCall of toolCalls) {
+          if (typeof toolCall?.index === "number") {
+            lastToolCallIndex = toolCall.index
+            if (typeof toolCall?.id === "string" && toolCall.id.length > 0) {
+              indexById.set(toolCall.id, toolCall.index)
+              if (toolCall.index >= nextIndex) {
+                nextIndex = toolCall.index + 1
+              }
+            }
+            continue
+          }
+          if (typeof toolCall?.id === "string" && toolCall.id.length > 0) {
+            const known = indexById.get(toolCall.id)
+            if (known != null) {
+              toolCall.index = known
+              lastToolCallIndex = known
+              continue
+            }
+            toolCall.index = nextIndex
+            indexById.set(toolCall.id, nextIndex)
+            lastToolCallIndex = nextIndex
+            nextIndex += 1
+            continue
+          }
+          if (lastToolCallIndex != null) {
+            toolCall.index = lastToolCallIndex
+            continue
+          }
+          toolCall.index = nextIndex
+          lastToolCallIndex = nextIndex
+          nextIndex += 1
+        }
+      }
+      return `data: ${JSON.stringify(parsed)}`
+    }
+
+    const patchEvent = (event: string) => event.split("\n").map(patchDataLine).join("\n")
+
+    const stream = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true })
+        const parts = buffer.split("\n\n")
+        buffer = parts.pop() ?? ""
+        for (const part of parts) {
+          controller.enqueue(encoder.encode(`${patchEvent(part)}\n\n`))
+        }
+      },
+      flush(controller) {
+        buffer += decoder.decode()
+        if (!buffer) {
+          return
+        }
+        controller.enqueue(encoder.encode(patchEvent(buffer)))
+      },
+    })
+
+    return new Response(response.body.pipeThrough(stream), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+  }
+
   const BUNDLED_PROVIDERS: Record<string, (options: any) => SDK> = {
     "@ai-sdk/amazon-bedrock": createAmazonBedrock,
     "@ai-sdk/anthropic": createAnthropic,
@@ -1103,11 +1204,15 @@ export namespace Provider {
           }
         }
 
-        return fetchFn(input, {
+        const response = await fetchFn(input, {
           ...opts,
           // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
           timeout: false,
         })
+        if (model.api.npm !== "@ai-sdk/openai-compatible") {
+          return response
+        }
+        return normalizeOpenAICompatibleSSE(response)
       }
 
       const bundledFn = BUNDLED_PROVIDERS[model.api.npm]

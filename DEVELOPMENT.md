@@ -1,134 +1,232 @@
-# OpenCode 开发指南 (DEVELOPMENT.md)
+# 开发与构建指南 (Development & Build Guide)
 
-本指南旨在帮助开发者快速了解 OpenCode 的项目架构、技术栈以及如何在本地环境进行开发。
-
----
-
-## 1. 技术栈 (Technology Stack)
-
-OpenCode 是一个基于 TypeScript 开发的高性能 AI 辅助工具，采用了现代化的开发工具链：
-
-- **运行时 (Runtime)**: [Bun](https://bun.sh/) 1.3.9+ (作为包管理器、测试运行器及脚本引擎)。
-- **后端/服务端核心**: 
-    - **API 框架**: [Hono](https://hono.dev/)，一个极简且快速的 Web 框架。
-    - **云原生部署**: [SST (Serverless Stack) v3](https://sst.dev/)。
-    - **AI SDK**: 使用 Vercel 的 [AI SDK](https://sdk.vercel.ai/) 进行多模型交互。
-- **前端/用户界面**:
-    - **UI 框架**: [SolidJS](https://www.solidjs.com/) (高性能、细粒度响应式)。
-    - **元框架**: [Solid Start](https://start.solidjs.com/)。
-    - **CSS 框架**: [Tailwind CSS v4](https://tailwindcss.com/)。
-    - **终端界面 (TUI)**: 基于 [opentui](https://github.com/sst/opentui)。
-- **桌面端**: [Tauri](https://tauri.app/) (基于 Rust 的跨平台应用框架)。
-- **项目管理**: [Turbo](https://turbo.build/) (用于 Monorepo 构建优化)。
+本文档介绍如何在本地开发、编译以及使用 Docker 部署 OpenCode。
 
 ---
 
-## 2. 项目架构 (Architecture)
+## 1. 本地开发 (Development)
 
-OpenCode 采用 **Monorepo (单体仓库)** 架构，通过 **Bun Workspaces** 管理子包：
+### 前置要求
+*   **Bun**: 1.3.5+
+*   **Ripgrep (rg)**: 必须安装在系统中。
 
-- **核心包 (`packages/opencode`)**: 包含 Agent 逻辑、LSP 适配、API 服务端及 TUI 逻辑。
-- **Web 应用 (`packages/app`)**: 全功能的 Web 交互界面。
-- **桌面端 (`packages/desktop`)**: 将 Web 应用包装为桌面原生程序。
-- **共享插件/SDK**: `packages/plugin` 和 `packages/sdk` 供跨包复用。
-
-项目遵循 **服务端-客户端 (Server-Client)** 模型，服务端负责 AI 控制流和文件系统交互，客户端（TUI/Web/Desktop）通过 SDK 与服务端通信。
-
----
-
-## 3. 本地开发环境设置
-
-### 3.1 准备工作
-请确保你的系统已安装 **Bun 1.3+**。
-
-### 3.2 安装依赖
-OpenCode 使用 Bun Workspaces，你**只需在根目录**执行一次安装即可：
+### 初始化
 ```bash
 bun install
 ```
-此命令会自动安装所有子包的依赖，无需逐一进入文件夹安装。
 
----
-
-## 4. 跑起项目
-
-### 4.1 启动服务端 (Headless Server)
-如果你只需要 API 服务，在根目录下运行：
+### 运行服务端 (Backend)
 ```bash
-bun dev serve
+# 在项目根目录下运行
+bun dev serve --port 4096
 ```
-- **默认监听端口**: `4096`。
-- **自定义端口**: `bun dev serve --port <port>`。
 
-### 4.2 启动 Web 界面
-有两种方式运行 Web 端：
-
-#### 方案 A：一键启动 (服务端 + Web)
+### 运行 Web 客户端 (Frontend)
 ```bash
-bun dev web
+cd packages/app
+bun dev
 ```
-这将启动服务端并自动在浏览器中打开 `http://127.0.0.1:4096/`。
-
-#### 方案 B：独立启动前端 (热更新开发模式)
-1. 终端 1 启动服务端：`bun dev serve`
-2. 终端 2 启动前端：`bun run --cwd packages/app dev`
-   - 前端通常运行在 `http://localhost:3000` 或 `5173`。
+*   **指定端口**: `VITE_OPENCODE_SERVER_PORT=8012 bun dev`
+*   **指定路径**: 访问 `http://localhost:3000/<Base64_Encoded_Path>`
 
 ---
 
-## 5. 核心代码导引
-- **Agent 逻辑**: `packages/opencode/src/agent/`
-- **API 定义**: `packages/opencode/src/server/`
-- **前端页面**: `packages/app/`
-- **TUI 界面**: `packages/opencode/src/cli/cmd/tui/`
+## 2. 编译打包 (Build)
 
----
-
-## 6. Docker 部署 (Docker Deployment)
-
-本节介绍如何构建 OpenCode 的 Docker 镜像并在服务器上运行。
-
-### 6.1 打包与构建 (Build & Package)
-
-由于 Dockerfile 采用的是将本地构建产物打包进镜像的策略，因此在构建 Docker 镜像之前，需要先在本地完成编译。
-
-1.  **编译项目产物**：
-    在根目录下执行：
-    ```bash
-    # 使用 Turbo 并行构建所有子包
-    bun x turbo build
-    ```
-    此命令会生成：
-    - 后端二进制文件：位于 `packages/opencode/dist/`
-    - 前端静态资源：位于 `packages/app/dist/`
-
-2.  **构建 Docker 镜像**：
-    ```bash
-    # 构建 amd64 架构镜像
-    docker buildx build --platform linux/amd64 -t opencode:latest --load .
-    ```
-
-### 6.2 导出与导入镜像 (Export & Import)
-
-如果需要在内网环境或不同机器间分发镜像：
-
-1.  **导出镜像文件**：
-    ```bash
-    docker save -o opencode-latest.tar opencode:latest
-    ```
-
-2.  **在目标机器加载镜像**：
-    ```bash
-    sudo docker load -i opencode-latest.tar
-    ```
-
-### 6.3 运行容器 (Running the Container)
-
-推荐使用以下配置运行容器，以确保数据的持久化和环境的适配：
-
+### 编译单文件二进制
 ```bash
-docker run -d \
-  --name opencode \
+# 针对当前平台（推荐）
+script/build.ts --single
+
+# 如果遇到 Integrity 错误，跳过安装步骤
+opencode/script/build.ts --single --skip-install
+```
+
+### 全平台构建 (macOS, Linux, Windows)
+```bash
+opencode/script/build.ts
+```
+**产物路径**: `packages/opencode/dist/`
+
+---
+
+## 3. Docker 构建与部署
+
+### 在 Colima/Mac 环境下配置 Buildx
+1.  **安装**: `brew install docker-buildx`
+2.  **配置**: `mkdir -p ~/.docker/cli-plugins && ln -sfn /opt/homebrew/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx`
+
+### 步骤 A：进入目录 (必选)
+```bash
+cd packages/opencode
+```
+
+### 步骤 B：准备 Web 客户端产物 (必选)
+目前 Dockerfile 需要 `packages/app/dist` 目录。在构建镜像前，必须先编译 Web 客户端并将其移动到 `packages/opencode/app-dist`。
+```bash
+# 1. 编译 Web 客户端
+cd packages/app
+bun run build
+
+# 2. 复制到 opencode 目录下的缓存目录
+mkdir -p ../opencode/app-dist
+cp -r dist/* ../opencode/app-dist/
+
+# 3. 回到 packages 目录
+cd ..
+```
+
+### 步骤 C：构建镜像  
+**构建 macOS 专用镜像 (v1 版本)**:
+   ```bash
+   docker buildx build --platform linux/arm64 \
+     -t macos:v6 --load .
+   ```
+
+### 步骤 C：导出镜像包
+```bash
+docker save -o opencode-macos-v1.tar macos:v1
+```
+
+### 步骤 D：在离线 macOS 中运行
+```bash
+docker run -it --rm \
+  -p 4096:4096 \
+  -v $(pwd):/work \
+  -e OPENCODE_DISABLE_MODELS_FETCH=true \
+  macos:v1 web --hostname 0.0.0.0
+```
+
+**关键参数解释：**
+*   **`-v $(pwd):/work`**: 将宿主机当前目录挂载到容器内的 `/work` 目录。
+*   **`--hostname 0.0.0.0`**: 必须加上此参数，否则宿主机浏览器无法访问容器内的服务。
+*   **目录说明**: 启动后，Web 界面默认看到的“当前目录”是容器内部的路径（默认为 `/`）。你需要在 Web 界面中打开 **`/work`** 目录（Base64 编码后的 URL）才能操作你挂载进去的宿主机代码。
+
+---
+
+## 4. 调试与排错 (Debug)
+
+### 进入 Docker 容器内部
+如果要检查镜像内部文件或环境，可以使用以下命令覆盖 Entrypoint 进入 Shell：
+```bash
+docker run -it --rm --entrypoint /bin/sh opencode:macos
+```
+
+---
+
+## 5. Docker 离线部署 (CentOS 7 / Linux AMD64)
+
+针对无法联网的 CentOS 7 服务器，需要在本地（Mac/Windows）构建好 `linux/amd64` 架构的镜像，导出后上传到服务器。
+
+### 步骤 A：本地构建镜像 (Mac/Windows)
+确保你已经安装了 Docker Desktop，并且开启了 Buildx 支持。
+
+1.  **进入项目目录**:
+    ```bash
+    cd packages/opencode
+    ```
+
+2.  **构建 AMD64/centos 镜像**:
+    ⚠️ 注意：CentOS 是 x86_64 架构，必须指定 `--platform linux/amd64`。
+    ```bash
+    docker buildx build --platform linux/amd64 \
+      -t opencode-serve-1814 \
+      --load \
+      .
+    ```
+
+3.  **导出镜像为文件**:
+    ```bash
+    docker save -o opencode-serve-v125-1949.tar opencode-serve-v125-1949
+    ```
+
+### 步骤 B：上传到服务器
+使用 `scp` 或 `sftp` 将 `opencode-centos-v1.tar` 上传到 CentOS 服务器。
+```bash
+# 示例
+scp opencode-centos-v1.tar user@your-centos-server:/home/user/
+```
+
+    ### 步骤 C：服务器端加载与运行 (CentOS 7)
+
+    1.  **准备配置目录 (重要)**:
+        为了防止服务器在启动时尝试联网安装插件导致卡死，必须手动创建一个包含 `node_modules` 的配置目录。
+        ```bash
+        mkdir -p opencode_data/config/node_modules
+        ```
+
+    2.  **加载镜像**:
+        ```bash
+        docker load -i opencode-centos-v1.tar
+        ```
+
+    3.  **运行容器**:
+        CentOS 7 内核较老，且可能没有网络权限。请使用以下命令启动：
+        ```bash
+        # 创建工作目录（如果需要）
+        mkdir -p /data/opencode_work
+
+        docker run -d \
+          --name opencode-server \
+          --restart always \
+          -p 4096:4096 \
+          -v /data/opencode_work:/work \
+          -v $(pwd)/opencode_data/config:/root/.config/opencode \
+          -e OPENCODE_DISABLE_MODELS_FETCH=true \
+          -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
+          -e OPENCODE_DISABLE_LSP_DOWNLOAD=true \
+          opencode-centos:v1 \
+          web --hostname 0.0.0.0
+        ```
+
+    **参数说明**:
+    *   `web --hostname 0.0.0.0`: **必须**。启动 Web 服务并允许外部访问。
+    *   `-v ...:/root/.config/opencode`: **关键**。挂载伪造的配置目录，骗过程序的插件安装检查，避免离线卡死。
+    *   `-e OPENCODE_DISABLE_MODELS_FETCH=true`: 禁用模型下载（离线必选）。
+    *   `-e OPENCODE_DISABLE_DEFAULT_PLUGINS=true`: **关键**。禁用自动安装默认插件。
+    *   `-e OPENCODE_DISABLE_LSP_DOWNLOAD=true`: **关键**。禁用自动下载语言服务器。
+    *   `--restart always`: 容器异常退出或重启后自动启动。
+    *   `-v ...:/work`: 挂载代码目录。
+
+3.  **验证运行**:
+    ```bash
+    docker logs -f opencode-server
+    ```
+    看到 `OpenCode server running at http://0.0.0.0:4096` 即表示成功。
+
+
+
+sudo docker run \
+  -it --rm \
+  -p 4096:4096 \
+  -e OPENCODE_DISABLE_MODELS_FETCH=true \
+  -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
+  -e OPENCODE_DISABLE_LSP_DOWNLOAD=true \
+  -v /data1/opencode:/home \
+  opencode-serve-1053:latest \
+  --log-level DEBUG --print-logs serve --hostname 0.0.0.0  
+
+
+  
+opencode-app-2251:latest
+
+
+--- 前段代码
+
+bun run build
+
+docker buildx build --platform linux/amd64 \
+      -t opencode-v125-03140822 \
+      --load \
+      . 
+
+
+docker save -o opencode-v125-03140822.tar opencode-v125-03140822
+
+ 
+sudo  docker load -i opencode-v125-03140822.tar
+ 
+sudo docker run  -d \
   -p 4096:4096 \
   -e OPENCODE_DISABLE_MODELS_FETCH=true \
   -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
@@ -136,18 +234,13 @@ docker run -d \
   -v /data1/opencode:/home \
   -v /data1/opencode/base/config:/root/.config/opencode \
   -v /data1/opencode/base/local:/root/.local \
-  opencode:latest \
-  serve --hostname 0.0.0.0 --cors "*" --log-level DEBUG --print-logs
-```
+  opencode-v125-03140822 \
+  --print-logs serve --hostname 0.0.0.0 --cors * --log-level DEBUG  
 
-#### 参数详解：
-- **端口映射 (`-p`)**: 将容器内的 `4096` 端口映射到宿主机的 `4096`。
-- **环境变量 (`-e`)**: 
-  - `OPENCODE_DISABLE_MODELS_FETCH`: 禁用模型自动拉取（适用于受限网络）。
-  - `OPENCODE_DISABLE_DEFAULT_PLUGINS`: 禁用默认插件加载。
-  - `OPENCODE_DISABLE_LSP_DOWNLOAD`: 禁用 LSP 自动下载。
-- **卷挂载 (`-v`)**: 
-  - `/home`: 挂载工作目录。
-  - `/root/.config/opencode`: 挂载配置文件目录。
-  - `/root/.local`: 挂载本地缓存及数据目录。
-- **启动参数**: 指定 `serve` 模式运行，监听 `0.0.0.0`，允许所有跨域请求 (`--cors "*"`)。
+
+docker exec -it 3f38319046be  /bin/sh
+
+
+/root/.config/opencode/skill_sync.sh upload https://kudata-agent.tmeoa.com/opencode /root/.config/opencode/skills/skill-creator leoliu AIK -l
+
+上一个 opencode镜像 opencode-v125-03091425:latest

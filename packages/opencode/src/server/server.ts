@@ -89,21 +89,21 @@ export namespace Server {
           return basicAuth({ username, password })(c, next)
         })
         .use(async (c, next) => {
-          const skipLogging = c.req.path === "/log"
-          if (!skipLogging) {
-            log.info("request", {
-              method: c.req.method,
-              path: c.req.path,
-            })
+          const skipLogging = c.req.path === "/log" || c.req.path === "/global/health"
+          if (skipLogging) {
+            await next()
+            return
           }
+          log.info("request", {
+            method: c.req.method,
+            path: c.req.path,
+          })
           const timer = log.time("request", {
             method: c.req.method,
             path: c.req.path,
           })
           await next()
-          if (!skipLogging) {
-            timer.stop()
-          }
+          timer.stop()
         })
         .use(
           cors({
