@@ -78,6 +78,27 @@ export namespace Server {
     return decoded
   }
   const appsecret = Flag.TPP_APPSECRET
+  const grants: Record<string, string | string[]> = (() => {
+    const path = Flag.OPENCODE_ACCESS_GRANTS
+    if (!path) return {}
+    try {
+      const raw = require("fs").readFileSync(path, "utf8")
+      const parsed = JSON.parse(raw)
+      log.info("access grants loaded", { path, grants: parsed })
+      return parsed
+    } catch (error) {
+      log.warn("failed to load access grants", { path, error })
+      return {}
+    }
+  })()
+  const canAccess = (user: string | undefined, account: string | undefined) => {
+    if (!user || !account) return false
+    if (user === account) return true
+    const allowed = grants[user]
+    if (allowed === "*") return true
+    if (Array.isArray(allowed) && allowed.includes(account)) return true
+    return false
+  }
   const denied = {
     message: "你没有该链接权限",
   }
@@ -856,7 +877,7 @@ export namespace Server {
                 log.info("decoded home account", { directory, account })
               }
 
-              if (user !== account) {
+              if (!canAccess(user, account)) {
                 log.warn("directory permission denied", {
                   account,
                   gatewayUser: user,

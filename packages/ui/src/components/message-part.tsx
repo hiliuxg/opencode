@@ -271,6 +271,12 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: "发送企微消息",
         subtitle: input.content ? (input.content.length > 30 ? input.content.slice(0, 30) + "..." : input.content) : undefined,
       }
+    case "kudata-mcp_manage_schedule":
+      return {
+        icon: "clock",
+        title: "创建任务",
+        subtitle: input.title ? `${input.op === "create" ? "创建" : input.op === "update" ? "修改" : "删除"} · ${input.title}` : undefined,
+      }
     case "skill":
       return {
         icon: "brain",
@@ -2078,6 +2084,71 @@ ToolRegistry.register({
 
 ToolRegistry.register({
   name: "kudata-mcp_send_message",
+  render(props) {
+    const i18n = useI18n()
+    const codeComponent = useCodeComponent()
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+
+    const inputContent = createMemo(() => {
+      try {
+        return JSON.stringify(props.input, null, 2)
+      } catch {
+        return String(props.input)
+      }
+    })
+
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: info().subtitle || "",
+        }}
+      >
+        <div data-component="mcp-tool-content">
+          <Tabs defaultValue={props.input ? "input" : "output"}>
+            <Tabs.List>
+              <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.input")}</Tabs.Trigger>
+              <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.output")}</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="input">
+              <div data-slot="mcp-sql-tabs-content">
+                <Dynamic
+                  component={codeComponent}
+                  file={{
+                    name: "input.json",
+                    contents: inputContent(),
+                    cacheKey: checksum(inputContent()),
+                  }}
+                  overflow="scroll"
+                />
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="output">
+              <div data-slot="mcp-sql-tabs-content">
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
+                  <Dynamic
+                    component={codeComponent}
+                    file={{
+                      name: "output.json",
+                      contents: props.output!,
+                      cacheKey: checksum(props.output!),
+                    }}
+                    overflow="scroll"
+                  />
+                </Show>
+              </div>
+            </Tabs.Content>
+          </Tabs>
+        </div>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_manage_schedule",
   render(props) {
     const i18n = useI18n()
     const codeComponent = useCodeComponent()

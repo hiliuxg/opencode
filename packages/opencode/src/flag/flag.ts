@@ -39,6 +39,7 @@ export namespace Flag {
     return normalized
   })()
   export const OPENCODE_STATIC_DIR = process.env["OPENCODE_STATIC_DIR"]
+  export const OPENCODE_ACCESS_GRANTS = process.env["OPENCODE_ACCESS_GRANTS"]
   export const TPP_APPSECRET = process.env["TPP_APPSECRET"] ?? "c1ad326beeb0dee83b127e77a07b3d9d"
   export const OPENCODE_ENABLE_QUESTION_TOOL = truthy("OPENCODE_ENABLE_QUESTION_TOOL")
 

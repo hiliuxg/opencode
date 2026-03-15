@@ -25,8 +25,8 @@ import {
 } from "@/utils/admin-api"
 
 const DEFAULT_USER_ID = 1
-const DEFAULT_PROVIDER = "kudata-provider"
-const DEFAULT_MODEL = "deepseek-v3.2"
+const DEFAULT_PROVIDER = "tme-continue-provider"
+const DEFAULT_MODEL = "Gemini-3.1-Pro"
 
 
 
