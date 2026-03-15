@@ -1998,7 +1998,15 @@ function EChartsRenderer(props: { data: string }) {
 
   const chartData = createMemo(() => {
     try {
-      return JSON.parse(props.data)
+      const parsed = JSON.parse(props.data)
+      for (const key of ["series", "xAxis", "yAxis"]) {
+        if (typeof parsed[key] === "string") {
+          try {
+            parsed[key] = JSON.parse(parsed[key])
+          } catch {}
+        }
+      }
+      return parsed
     } catch {
       return null
     }
@@ -2013,8 +2021,9 @@ function EChartsRenderer(props: { data: string }) {
 
     const option: Record<string, any> = {}
 
+    if (data.title) option.title = { text: data.title }
     option.tooltip = { trigger: "axis" }
- 
+
     option.xAxis = { type: "category", data: data.xAxis || [] }
     option.yAxis = { type: "value" }
 
