@@ -40,12 +40,108 @@ import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
+import { createHash, createDecipheriv } from "node:crypto"
+import { base64Decode, base64Encode } from "@opencode-ai/util/encode"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
 
 export namespace Server {
   const log = Log.create({ service: "server" })
+  const csp =
+    "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com"
+  const gatewayUser = z.object({
+    ename: z.string(),
+    id: z.string(),
+    cname: z.string(),
+    email: z.string(),
+  })
+
+  const headers = (response: Response) => {
+    response.headers.set("Content-Security-Policy", csp)
+    response.headers.set("Access-Control-Allow-Origin", "*")
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    response.headers.set("Access-Control-Allow-Headers", "*")
+    return response
+  }
+
+  const decodeToken = (token: string, timestamp: string, appsecret: string) => {
+    const hash = createHash("md5")
+      .update(`${timestamp}${appsecret}${timestamp}`)
+      .digest("hex")
+    const key = hash.slice(0, 16)
+    const iv = hash.slice(-16)
+    const cipher = Buffer.from(token, "base64").toString("binary")
+    const decipher = createDecipheriv("aes-128-cbc", key, iv)
+    let decoded = decipher.update(cipher, "binary", "utf8")
+    decoded += decipher.final("utf8")
+    return decoded
+  }
+  const appsecret = Flag.TPP_APPSECRET
+  const denied = {
+    message: "你没有该链接权限",
+  }
+  const protectedPath = (parts: string[]) =>
+    parts.length >= 2 &&
+    (parts[1] === "session" || ((parts[1] === "skills" || parts[1] === "api-doc") && parts.length === 2))
+  const decodeDirectory = (segment: string) => {
+    try {
+      const directory = base64Decode(segment)
+      if (!directory.startsWith("/")) {
+        log.info("decoded directory invalid", {
+          encoded: segment,
+          reason: "not-directory",
+          directory,
+        })
+        return
+      }
+      log.info("decoded directory valid", {
+        encoded: segment,
+        directory,
+      })
+      return directory
+    } catch (error) {
+      log.info("decoded directory invalid", {
+        encoded: segment,
+        reason: "decode-failed",
+        error,
+      })
+      return
+    }
+  }
+  const decodeGatewayUser = (
+    token: string | undefined,
+    timestamp: string | undefined,
+    requestId: string | undefined,
+    source: string,
+  ) => {
+    log.info("gateway headers", {
+      source,
+      token,
+      timestamp,
+      requestId,
+    })
+    if (!token || !timestamp) return
+    try {
+      const raw = decodeToken(token, timestamp, appsecret)
+      const parsed = gatewayUser.safeParse(JSON.parse(raw))
+      if (!parsed.success) {
+        log.warn("gateway user parse failed", { source, raw })
+        return
+      }
+      log.info("gateway user", {
+        source,
+        ...parsed.data,
+      })
+      return parsed.data.ename
+    } catch (error) {
+      log.warn("gateway token decode failed", {
+        source,
+        error,
+      })
+      return
+    }
+  }
 
   let _url: URL | undefined
   let _corsWhitelist: string[] = []
@@ -726,9 +822,67 @@ export namespace Server {
             reqPath = reqPath.slice(basePath.length)
           }
 
-          if (reqPath === "" || reqPath === "/") reqPath = "/index.html"
+          log.info("reqPath=", { reqPath })
 
-          const publicDir = process.env.OPENCODE_STATIC_DIR || "/usr/local/bin/ui"
+          const host = c.req.header("host") ?? ""
+          const local =
+            host.startsWith("localhost") ||
+            host.startsWith("127.0.0.1") ||
+            host.startsWith("0.0.0.0")
+
+          if (!local) {
+            const parts = reqPath.split("/").filter(Boolean)
+            const segment = parts[0]
+
+            if (protectedPath(parts) && segment) {
+              log.info("segment=", { segment })
+              const directory = decodeDirectory(segment)
+              const token = c.req.header("x-token")
+              const timestamp = c.req.header("x-timestamp")
+              const requestId = c.req.header("x-request-id")
+              const user = decodeGatewayUser(token, timestamp, requestId, "protected")
+
+              if (!directory) {
+                log.warn("directory permission denied", {
+                  reason: "decode-failed",
+                  gatewayUser: user,
+                  reqPath,
+                })
+                return c.json(denied, { status: 403 })
+              }
+
+              const account = directory.startsWith("/home/") ? directory.split("/")[2] : undefined
+              if (account) {
+                log.info("decoded home account", { directory, account })
+              }
+
+              if (user !== account) {
+                log.warn("directory permission denied", {
+                  account,
+                  gatewayUser: user,
+                  reqPath,
+                })
+                return c.json(denied, { status: 403 })
+              }
+            }
+
+            if (reqPath === "" || reqPath === "/" || reqPath === basePath) {
+              const token = c.req.header("x-token")
+              const timestamp = c.req.header("x-timestamp")
+              const requestId = c.req.header("x-request-id")
+              const user = decodeGatewayUser(token, timestamp, requestId, "root")
+
+              if (!user) {
+                return c.json(denied, { status: 403 })
+              }
+
+              const directory = `/home/${user}`
+              const encoded = base64Encode(directory)
+              return c.redirect(`${basePath}/${encoded}/session`)
+            }
+          }
+
+          const publicDir = Flag.OPENCODE_STATIC_DIR || "/usr/local/bin/ui"
           let file = Bun.file(`${publicDir}${reqPath}`)
           let exists = await file.exists()
 
@@ -739,14 +893,7 @@ export namespace Server {
 
           if (exists) {
             const response = new Response(file)
-            response.headers.set(
-              "Content-Security-Policy",
-              "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com",
-            )
-            response.headers.set("Access-Control-Allow-Origin", "*")
-            response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-            response.headers.set("Access-Control-Allow-Headers", "*")
-            return response
+            return headers(response)
           }
 
           const response = await proxy(`https://app.opencode.ai${c.req.path}`, {
@@ -756,14 +903,7 @@ export namespace Server {
               host: "app.opencode.ai",
             },
           })
-          response.headers.set(
-            "Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com",
-            )
-          response.headers.set("Access-Control-Allow-Origin", "*")
-          response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-          response.headers.set("Access-Control-Allow-Headers", "*")
-          return response
+          return headers(response)
         }) as unknown as Hono,
   )
 

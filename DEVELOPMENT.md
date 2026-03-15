@@ -228,6 +228,7 @@ sudo  docker load -i opencode-v125-03140822.tar
  
 sudo docker run  -d \
   -p 4096:4096 \
+  -e OPENCODE_BASE_PATH=/kgbi/starbot \
   -e OPENCODE_DISABLE_MODELS_FETCH=true \
   -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
   -e OPENCODE_DISABLE_LSP_DOWNLOAD=true \

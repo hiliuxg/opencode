@@ -170,6 +170,7 @@ export function AppInterface(props: {
         <GlobalSDKProvider>
           <GlobalSyncProvider>
             <Router
+              base={import.meta.env.BASE_URL.replace(/\/$/, "") || undefined}
               root={(routerProps) => <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>}
             >
               <Route path="/" component={HomeRoute} />
