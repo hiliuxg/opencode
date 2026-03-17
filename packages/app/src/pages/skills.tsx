@@ -355,11 +355,8 @@ export default function SkillsPage() {
                     <Button variant="secondary" onClick={() => setGitModalOpen(true)}>
                         获取技能
                     </Button>
-                    <Button variant="secondary" onClick={() => setKbModalOpen(true)}>
+                    <Button variant="primary" onClick={() => setKbModalOpen(true)}>
                         {language.t("skills.kb.create")}
-                    </Button>
-                    <Button variant="primary" onClick={handleCreate}>
-                        {language.t("skills.create")}
                     </Button>
                 </div>
             </div>

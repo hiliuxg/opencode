@@ -1114,6 +1114,10 @@ export default function Layout(props: ParentProps) {
     navigateWithSidebarReset(`/${base64Encode(dir)}/api-doc`)
   }
 
+  function openOperationDoc() {
+    platform.openLink("https://doc.weixin.qq.com/doc/w3_AK4A6wYLAEsCN3jlfwmALTB217c4B?scode=AOYA2wdwAA8ZPQcqFUAK4A6wYLAEs")
+  }
+
   function projectRoot(directory: string) {
     const project = layout.projects
       .list()
@@ -2024,6 +2028,8 @@ export default function Layout(props: ParentProps) {
               onOpenSkills={openSkills}
               apiDocLabel={() => language.t("sidebar.apiDoc")}
               onOpenApiDoc={openApiDoc}
+              operationDocLabel={() => language.t("sidebar.operationDoc")}
+              onOpenOperationDoc={openOperationDoc}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}
@@ -2095,6 +2101,8 @@ export default function Layout(props: ParentProps) {
               onOpenSkills={openSkills}
               apiDocLabel={() => language.t("sidebar.apiDoc")}
               onOpenApiDoc={openApiDoc}
+              operationDocLabel={() => language.t("sidebar.operationDoc")}
+              onOpenOperationDoc={openOperationDoc}
               settingsLabel={() => language.t("sidebar.settings")}
               settingsKeybind={() => command.keybind("settings.open")}
               onOpenSettings={openSettings}

@@ -216,15 +216,15 @@ opencode-app-2251:latest
 bun run build
 
 docker buildx build --platform linux/amd64 \
-      -t opencode-v125-03140822 \
+      -t opencode-v125-03152153 \
       --load \
       . 
 
 
-docker save -o opencode-v125-03140822.tar opencode-v125-03140822
+docker save -o opencode-v125-03152153.tar opencode-v125-03152153
 
  
-sudo  docker load -i opencode-v125-03140822.tar
+sudo  docker load -i opencode-v125-03152153.tar
  
 sudo docker run  -d \
   -p 4096:4096 \
@@ -236,7 +236,7 @@ sudo docker run  -d \
   -v /data1/opencode:/home \
   -v /data1/opencode/base/config:/root/.config/opencode \
   -v /data1/opencode/base/local:/root/.local \
-  opencode-v125-03140822 \
+  opencode-v125-03152153 \
   --print-logs serve --hostname 0.0.0.0 --cors * --log-level DEBUG  
 
 

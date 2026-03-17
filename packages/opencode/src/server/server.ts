@@ -206,7 +206,7 @@ export namespace Server {
           return basicAuth({ username, password })(c, next)
         })
         .use(async (c, next) => {
-          const skipLogging = c.req.path === "/log" || c.req.path === "/global/health"
+          const skipLogging = c.req.path === "/log" || c.req.path === "/global/health" || c.req.path === "/kgbi/starbot/global/health"
           if (skipLogging) {
             await next()
             return

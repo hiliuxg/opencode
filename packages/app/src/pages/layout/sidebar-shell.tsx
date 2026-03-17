@@ -32,6 +32,8 @@ export const SidebarContent = (props: {
   onOpenSkills: () => void
   apiDocLabel: Accessor<string>
   onOpenApiDoc: () => void
+  operationDocLabel: Accessor<string>
+  onOpenOperationDoc: () => void
   settingsLabel: Accessor<string>
   settingsKeybind: Accessor<string | undefined>
   onOpenSettings: () => void
@@ -112,6 +114,15 @@ export const SidebarContent = (props: {
               size="large"
               onClick={props.onOpenApiDoc}
               aria-label={props.apiDocLabel()}
+            />
+          </Tooltip>
+          <Tooltip placement={placement()} value={props.operationDocLabel()}>
+            <IconButton
+              icon="open-file"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenOperationDoc}
+              aria-label={props.operationDocLabel()}
             />
           </Tooltip>
           <TooltipKeybind placement={placement()} title={props.settingsLabel()} keybind={props.settingsKeybind() ?? ""}>
