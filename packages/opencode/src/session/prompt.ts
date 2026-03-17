@@ -321,7 +321,7 @@ export namespace SessionPrompt {
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
       if (
         lastAssistant?.finish &&
-        !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
+        lastAssistant.finish !== "tool-calls" &&
         !lastAssistantHasToolCall &&
         lastUser.id < lastAssistant.id
       ) {
@@ -330,6 +330,15 @@ export namespace SessionPrompt {
       }
 
       step++
+      if (step > 30) {
+        log.error("loop exceeded 30 iterations, breaking", {
+          sessionID,
+          step,
+          lastAssistantFinish: lastAssistant?.finish,
+          lastAssistantTokens: lastAssistant?.tokens,
+        })
+        break
+      }
       if (step === 1)
         ensureTitle({
           session,
@@ -690,8 +699,7 @@ export namespace SessionPrompt {
         break
       }
 
-      // Check if model finished (finish reason is not "tool-calls" or "unknown")
-      const modelFinished = processor.message.finish && !["tool-calls", "unknown"].includes(processor.message.finish)
+      const modelFinished = processor.message.finish && processor.message.finish !== "tool-calls"
 
       if (modelFinished && !processor.message.error) {
         if (format.type === "json_schema") {
@@ -699,6 +707,20 @@ export namespace SessionPrompt {
           processor.message.error = new MessageV2.StructuredOutputError({
             message: "Model did not produce structured output",
             retries: 0,
+          }).toObject()
+          await Session.updateMessage(processor.message)
+          break
+        }
+      }
+
+      if (processor.message.finish === "unknown" && !processor.message.error) {
+        const responseParts = await MessageV2.parts(processor.message.id)
+        const hasToolCall = responseParts.some((part) => part.type === "tool")
+        const hasText = responseParts.some((part) => part.type === "text" && !!part.text.trim())
+        const hasReasoning = responseParts.some((part) => part.type === "reasoning" && !!part.text.trim())
+        if (!hasToolCall && !hasText && !hasReasoning) {
+          processor.message.error = new NamedError.Unknown({
+            message: "Upstream model returned an empty response. Please switch to another model and try again.",
           }).toObject()
           await Session.updateMessage(processor.message)
           break

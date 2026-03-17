@@ -660,40 +660,101 @@ export namespace Server {
           ),
           async (c) => {
             const { name, skillPath } = c.req.valid("json")
+            log.info("[skill/publish] starting", { name, skillPath })
 
             const toplevel = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], { cwd: skillPath })
-            if (toplevel.exitCode !== 0) return c.json({ status: "no-git" as const })
+            if (toplevel.exitCode !== 0) {
+              log.warn("[skill/publish] not a git repository", { skillPath, exitCode: toplevel.exitCode })
+              return c.json({ status: "no-git" as const })
+            }
             const repoDir = new TextDecoder().decode(toplevel.stdout).trim()
+            log.info("[skill/publish] git toplevel", { repoDir })
 
             const remoteProc = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: repoDir })
             const remoteUrl = new TextDecoder().decode(remoteProc.stdout).trim()
-            if (!remoteUrl) return c.json({ status: "no-git" as const })
+            if (!remoteUrl) {
+              log.warn("[skill/publish] no remote origin", { repoDir })
+              return c.json({ status: "no-git" as const })
+            }
+            const safeRemote = remoteUrl.replace(/:\/\/([^:@/]+):([^@/]+)@/, "://$1:***@")
+            log.info("[skill/publish] remote url", { remoteUrl: safeRemote })
 
             const parsed = new URL(remoteUrl)
             parsed.username = name
             parsed.password = "6bBshCz1222EXVlD4Q7M1i8x07A"
             const authedUrl = parsed.toString()
+            log.info("[skill/publish] built auth url", { host: parsed.host, pathname: parsed.pathname, username: parsed.username })
 
             const fetchProc = Bun.spawn(["git", "fetch", "origin"], { cwd: repoDir })
             await fetchProc.exited
+            log.info("[skill/publish] git fetch done", { exitCode: fetchProc.exitCode })
+            if (fetchProc.exitCode !== 0) throw new NamedError.Unknown({ message: "git fetch failed" })
 
             const branchProc = Bun.spawnSync(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd: repoDir })
             const branch = new TextDecoder().decode(branchProc.stdout).trim() || "main"
+            log.info("[skill/publish] current branch", { branch })
 
             const aheadProc = Bun.spawnSync(["git", "log", `HEAD..origin/${branch}`, "--oneline"], { cwd: repoDir })
             const ahead = new TextDecoder().decode(aheadProc.stdout).trim()
-            if (ahead) return c.json({ status: "remote-ahead" as const })
-
-            Bun.spawnSync(["git", "add", "-A"], { cwd: repoDir })
-            const diffProc = Bun.spawnSync(["git", "diff", "--cached", "--quiet"], { cwd: repoDir })
-            if (diffProc.exitCode !== 0) {
-              Bun.spawnSync(["git", "commit", "-m", "auto publish"], { cwd: repoDir })
+            log.info("[skill/publish] remote ahead check", { ahead: ahead || null, hasRemoteCommits: !!ahead })
+            if (ahead) {
+              log.warn("[skill/publish] remote has commits not in local", { ahead })
+              return c.json({ status: "remote-ahead" as const })
             }
 
-            const pushProc = Bun.spawn(["git", "push", authedUrl, branch], { cwd: repoDir })
-            await pushProc.exited
-            if (pushProc.exitCode !== 0) throw new NamedError.Unknown({ message: "git push failed" })
+            Bun.spawnSync(["git", "add", "-A"], { cwd: repoDir })
+            log.info("[skill/publish] git add -A done")
 
+            const diffProc = Bun.spawnSync(["git", "diff", "--cached", "--stat"], { cwd: repoDir })
+            const diffStat = new TextDecoder().decode(diffProc.stdout).trim()
+            const diffExit = Bun.spawnSync(["git", "diff", "--cached", "--quiet"], { cwd: repoDir }).exitCode
+            const hasChanges = diffExit !== 0
+            log.info("[skill/publish] staged changes check", { hasChanges, diffStat: diffStat || null })
+
+            if (hasChanges) {
+              const email = `${name}@tencentmusic.com`
+              const commitProc = Bun.spawnSync(
+                ["git", "-c", `user.name=${name}`, "-c", `user.email=${email}`, "commit", "-m", "auto publish"],
+                { cwd: repoDir },
+              )
+              const commitOutput = new TextDecoder().decode(commitProc.stdout).trim()
+              const commitError = new TextDecoder().decode(commitProc.stderr).trim()
+              log.info("[skill/publish] git commit done", {
+                exitCode: commitProc.exitCode,
+                name,
+                email,
+                output: commitOutput || null,
+                stderr: commitError || null,
+              })
+              if (commitProc.exitCode !== 0) {
+                const message = commitError || commitOutput || "git commit failed"
+                throw new NamedError.Unknown({ message })
+              }
+            } else {
+              log.info("[skill/publish] no staged changes to commit")
+            }
+
+            const pushProc = Bun.spawn(["git", "push", authedUrl, branch], {
+              cwd: repoDir,
+              stdout: "pipe",
+              stderr: "pipe",
+            })
+            await pushProc.exited
+            const pushStdout = (await new Response(pushProc.stdout).text()).trim()
+            const pushStderr = (await new Response(pushProc.stderr).text()).trim()
+            log.info("[skill/publish] git push result", {
+              exitCode: pushProc.exitCode,
+              stdout: pushStdout || null,
+              stderr: pushStderr || null,
+              success: pushProc.exitCode === 0,
+            })
+
+            if (pushProc.exitCode !== 0) {
+              log.error("[skill/publish] git push failed", { exitCode: pushProc.exitCode, stderr: pushStderr })
+              throw new NamedError.Unknown({ message: "git push failed" })
+            }
+
+            log.info("[skill/publish] push successful", { branch, repoDir })
             return c.json({ status: "pushed" as const })
           },
         )
