@@ -68,6 +68,7 @@
     "solid-list": "catalog:",
     "tailwindcss": "catalog:",
     "virtua": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "echarts": "6.0.0"
   }
 }

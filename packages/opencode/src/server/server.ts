@@ -49,7 +49,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false
 export namespace Server {
   const log = Log.create({ service: "server" })
   const csp =
-    "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com; manifest-src 'self' https://passport.tmeoa.com"
+    "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data: localhost:* 127.0.0.1:* https://kudata-agent.tmeoa.com https://passport.tmeoa.com https://opencode.ai; manifest-src 'self' https://passport.tmeoa.com"
   const gatewayUser = z.object({
     ename: z.string(),
     id: z.string(),
@@ -895,16 +895,22 @@ export namespace Server {
         )
         .all("/*", async (c) => {
           let reqPath = c.req.path
-          const basePath = Flag.OPENCODE_BASE_PATH
+          let basePath = Flag.OPENCODE_BASE_PATH
 
-          // 如果 basePath 存在，由于 app.basePath() 被调用
-          // 控制器仍会收到包含 basePath 的 c.req.path
-          // 因此需要从 reqPath 中剥离它用于静态文件映射
+          // 规范化 basePath，去除尾部斜杠
+          if (basePath) {
+            basePath = basePath.replace(/\/$/, "")
+          }
+
+          // 剥离 basePath 用于静态文件映射
           if (basePath && reqPath.startsWith(basePath)) {
             reqPath = reqPath.slice(basePath.length)
           }
 
-          log.info("reqPath=", { reqPath })
+          // 确保 reqPath 以 / 开头
+          if (reqPath && !reqPath.startsWith("/")) {
+            reqPath = "/" + reqPath
+          }
 
           const host = c.req.header("host") ?? ""
           const local =
@@ -915,9 +921,10 @@ export namespace Server {
           if (!local) {
             const parts = reqPath.split("/").filter(Boolean)
             const segment = parts[0]
+            const isDashboard = reqPath.toLowerCase() === "/dashboard"
 
-            if (protectedPath(parts) && segment) {
-              log.info("segment=", { segment })
+            // Dashboard 是公开 SPA 路由，跳过目录权限检查
+            if (!isDashboard && protectedPath(parts) && segment) {
               const directory = decodeDirectory(segment)
               const token = c.req.header("x-token")
               const timestamp = c.req.header("x-timestamp")
@@ -925,30 +932,18 @@ export namespace Server {
               const user = decodeGatewayUser(token, timestamp, requestId, "protected")
 
               if (!directory) {
-                log.warn("directory permission denied", {
-                  reason: "decode-failed",
-                  gatewayUser: user,
-                  reqPath,
-                })
                 return c.json(denied, { status: 403 })
               }
 
               const account = directory.startsWith("/home/") ? directory.split("/")[2] : undefined
-              if (account) {
-                log.info("decoded home account", { directory, account })
-              }
 
               if (!canAccess(user, account)) {
-                log.warn("directory permission denied", {
-                  account,
-                  gatewayUser: user,
-                  reqPath,
-                })
                 return c.json(denied, { status: 403 })
               }
             }
 
-            if (reqPath === "" || reqPath === "/" || reqPath === basePath) {
+            // 根路径重定向到用户默认 session
+            if (reqPath === "" || reqPath === "/") {
               const token = c.req.header("x-token")
               const timestamp = c.req.header("x-timestamp")
               const requestId = c.req.header("x-request-id")
@@ -968,6 +963,7 @@ export namespace Server {
           let file = Bun.file(`${publicDir}${reqPath}`)
           let exists = await file.exists()
 
+          // SPA 路由回退到 index.html
           if (!exists && !reqPath.includes(".")) {
             file = Bun.file(`${publicDir}/index.html`)
             exists = await file.exists()

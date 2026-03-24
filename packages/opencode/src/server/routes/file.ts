@@ -8,6 +8,8 @@ import { Ripgrep } from "../../file/ripgrep"
 import { LSP } from "../../lsp"
 import { Instance } from "../../project/instance"
 import { lazy } from "../../util/lazy"
+import { Filesystem } from "../../util/filesystem"
+import { errors } from "../error"
 
 export const FileRoutes = lazy(() =>
   new Hono()
@@ -298,6 +300,61 @@ export const FileRoutes = lazy(() =>
         c.header("Content-Disposition", `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`)
         c.header("Content-Type", file.type || "application/octet-stream")
         return c.body(file.stream())
+      },
+    )
+    .get(
+      "/file/view",
+      describeRoute({
+        summary: "View file in browser",
+        description: "View file content directly in browser. Supports HTML (rendered), PDF (inline), and text files.",
+        operationId: "file.view",
+        responses: {
+          200: {
+            description: "File content rendered in browser",
+          },
+          ...errors(400, 403, 404),
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          path: z.string().describe("Absolute path to the file to view"),
+        }),
+      ),
+      async (c) => {
+        const filePath = c.req.valid("query").path
+        const full = nodePath.resolve(Instance.directory, filePath)
+        if (!Instance.containsPath(full)) {
+          return c.json({ error: "Access denied: path escapes project directory" }, 403)
+        }
+        if (!(await Filesystem.exists(full))) {
+          return c.json({ error: "File not found" }, 404)
+        }
+
+        const lowerPath = full.toLowerCase()
+
+        // PDF files - return binary for browser to render inline
+        if (lowerPath.endsWith(".pdf")) {
+          const buffer = await Filesystem.readBytes(full)
+          c.header("Content-Type", "application/pdf")
+          c.header("Content-Disposition", "inline")
+          return c.body(new Uint8Array(buffer))
+        }
+
+        // HTML files - return text/html for browser to render
+        if (lowerPath.endsWith(".html") || lowerPath.endsWith(".htm")) {
+          const content = await Filesystem.readText(full)
+          c.header("Content-Type", "text/html; charset=utf-8")
+          return c.body(content)
+        }
+
+        // Text files - return text/plain
+        const content = await File.read(filePath)
+        if (content.type === "binary") {
+          return c.json({ error: "Binary files cannot be viewed in browser. Use /file/download instead." }, 400)
+        }
+        c.header("Content-Type", "text/plain; charset=utf-8")
+        return c.body(content.content)
       },
     ),
 )

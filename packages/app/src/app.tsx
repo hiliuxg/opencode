@@ -9,8 +9,8 @@ import { Diff } from "@opencode-ai/ui/diff"
 import { Font } from "@opencode-ai/ui/font"
 import { ThemeProvider } from "@opencode-ai/ui/theme"
 import { MetaProvider } from "@solidjs/meta"
-import { Navigate, Route, Router } from "@solidjs/router"
-import { ErrorBoundary, type JSX, lazy, type ParentProps, Show, Suspense } from "solid-js"
+import { Navigate, Route, Router, useLocation } from "@solidjs/router"
+import { createMemo, ErrorBoundary, type JSX, lazy, type ParentProps, Show, Suspense } from "solid-js"
 import { CommandProvider } from "@/context/command"
 import { CommentsProvider } from "@/context/comments"
 import { FileProvider } from "@/context/file"
@@ -51,10 +51,17 @@ const SessionRoute = () => (
 
 const Skills = lazy(() => import("@/pages/skills"))
 const ApiDoc = lazy(() => import("@/pages/api-doc"))
+const DashboardPage = lazy(() => import("@/pages/dashboard"))
 
 const SkillsRoute = () => (
   <Suspense fallback={<Loading />}>
     <Skills />
+  </Suspense>
+)
+
+const DashboardRoute = () => (
+  <Suspense fallback={<Loading />}>
+    <DashboardPage />
   </Suspense>
 )
 
@@ -106,6 +113,26 @@ function AppShellProviders(props: ParentProps) {
   )
 }
 
+function AppShellProvidersNoSidebar(props: ParentProps) {
+  return (
+    <SettingsProvider>
+      <PermissionProvider>
+        <LayoutProvider>
+          <NotificationProvider>
+            <ModelsProvider>
+              <CommandProvider>
+                <HighlightsProvider>
+                  <div class="size-full">{props.children}</div>
+                </HighlightsProvider>
+              </CommandProvider>
+            </ModelsProvider>
+          </NotificationProvider>
+        </LayoutProvider>
+      </PermissionProvider>
+    </SettingsProvider>
+  )
+}
+
 function SessionProviders(props: ParentProps) {
   return (
     <TerminalProvider>
@@ -119,11 +146,24 @@ function SessionProviders(props: ParentProps) {
 }
 
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
+  const location = useLocation()
+  const isFullPage = createMemo(() => {
+    // 处理带 basePath 的路径，如 /kgbi/starbot/dashboard
+    return location.pathname === "/dashboard" || location.pathname.endsWith("/dashboard")
+  })
+
   return (
-    <AppShellProviders>
-      {props.appChildren}
-      {props.children}
-    </AppShellProviders>
+    <Show when={isFullPage()} fallback={
+      <AppShellProviders>
+        {props.appChildren}
+        {props.children}
+      </AppShellProviders>
+    }>
+      <AppShellProvidersNoSidebar>
+        {props.appChildren}
+        {props.children}
+      </AppShellProvidersNoSidebar>
+    </Show>
   )
 }
 
@@ -174,6 +214,7 @@ export function AppInterface(props: {
               root={(routerProps) => <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>}
             >
               <Route path="/" component={HomeRoute} />
+              <Route path="/dashboard" component={DashboardRoute} />
               <Route path="/:dir" component={DirectoryLayout}>
                 <Route path="/" component={SessionIndexRoute} />
                 <Route path="/session/:id?" component={SessionRoute} />

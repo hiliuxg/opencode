@@ -76,6 +76,7 @@
         "@solidjs/router": "catalog:",
         "@thisbeyond/solid-dnd": "0.7.5",
         "diff": "catalog:",
+        "echarts": "6.0.0",
         "fuzzysort": "catalog:",
         "ghostty-web": "0.4.0",
         "luxon": "catalog:",

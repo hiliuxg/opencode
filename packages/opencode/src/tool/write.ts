@@ -52,6 +52,7 @@ export const WriteTool = Tool.define("write", {
     FileTime.read(ctx.sessionID, filepath)
 
     let output = "Wrote file successfully."
+
     await LSP.touchFile(filepath, true)
     const diagnostics = await LSP.diagnostics()
     const normalizedFilepath = Filesystem.normalizePath(filepath)
@@ -71,14 +72,35 @@ export const WriteTool = Tool.define("write", {
       output += `\n\nLSP errors detected in other files:\n<diagnostics file="${file}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
     }
 
-    return {
-      title: path.relative(Instance.worktree, filepath),
-      metadata: {
-        diagnostics,
-        filepath,
-        exists: exists,
-      },
-      output,
+
+     // Add browser view link for HTML files
+     if (filepath.toLowerCase().endsWith(".html") || filepath.toLowerCase().endsWith(".htm")) {
+      const relativePath = path.relative(Instance.directory, filepath)
+      const viewUrl = `https://kudata-agent.tmeoa.com/kgbi/starbot/file/view?path=${encodeURIComponent(relativePath)}&directory=${encodeURIComponent(Instance.directory)}`
+      const filename = path.basename(filepath)
+      output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${viewUrl})`
+      return {
+        title: path.relative(Instance.worktree, filepath),
+        metadata: {
+          diagnostics,
+          localPath: filepath,
+          exists: exists,
+          browserViewUrl: viewUrl,
+        },
+        output,
+      }
     }
+    else {
+      return {
+        title: path.relative(Instance.worktree, filepath),
+        metadata: {
+          diagnostics,
+          filepath,
+          exists: exists,
+        },
+        output,
+      }
+    }
+    
   },
 })
