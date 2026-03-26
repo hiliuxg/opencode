@@ -2002,20 +2002,26 @@ function EChartsRenderer(props: { data: string }) {
   let containerRef: HTMLDivElement | undefined
   let chartInstance: echarts.ECharts | undefined
 
-  const chartData = createMemo(() => {
+  const parsed = createMemo(() => {
     try {
-      const parsed = JSON.parse(props.data)
-      for (const key of ["series", "xAxis", "yAxis"]) {
-        if (typeof parsed[key] === "string") {
-          try {
-            parsed[key] = JSON.parse(parsed[key])
-          } catch {}
-        }
-      }
-      return parsed
-    } catch {
-      return null
+      return JSON.parse(props.data) as { success: boolean; message?: string; data?: Record<string, any> }
+    } catch (e) {
+      return { success: false, message: `JSON parse error: ${e instanceof Error ? e.message : String(e)}` }
     }
+  })
+
+  const chartData = createMemo(() => {
+    const result = parsed()
+    if (!result.success || !result.data) return null
+    const chart = result.data
+    for (const key of ["series", "xAxis", "yAxis"]) {
+      if (typeof chart[key] === "string") {
+        try {
+          chart[key] = JSON.parse(chart[key])
+        } catch {}
+      }
+    }
+    return chart
   })
 
   createEffect(() => {
@@ -2044,7 +2050,7 @@ function EChartsRenderer(props: { data: string }) {
 
     option.series = seriesData.map((s: any) => ({
       ...s,
-      type: data.type || s.type || "bar",
+      type: data.chart_type || s.type || "bar",
     }))
 
     chartInstance.setOption(option)
@@ -2053,8 +2059,26 @@ function EChartsRenderer(props: { data: string }) {
   })
 
   return (
-    <Show when={chartData()} fallback={<div>Invalid chart data</div>}>
-      <div ref={containerRef} style={{ width: "100%", height: "350px" }} />
+    <Show
+      when={parsed().success}
+      fallback={
+        <div
+          style={{
+            padding: "12px",
+            color: "var(--color-danger, #e53e3e)",
+            background: "var(--color-danger-subtle, #fff5f5)",
+            "border-radius": "6px",
+            "font-size": "13px",
+            "word-break": "break-word",
+          }}
+        >
+          Chart error: {parsed().message ?? "Unknown error"}
+        </div>
+      }
+    >
+      <Show when={chartData()} fallback={<div>No chart data</div>}>
+        <div ref={containerRef} style={{ width: "100%", height: "350px" }} />
+      </Show>
     </Show>
   )
 }

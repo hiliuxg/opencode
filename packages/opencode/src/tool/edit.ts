@@ -141,11 +141,60 @@ export const EditTool = Tool.define("edit", {
       output += `\n\nLSP errors detected in this file, please fix:\n<diagnostics file="${filePath}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
     }
 
+    // 编辑成功之后，如果发现是html，重新上传并生成访问链接
+    if (filePath.toLowerCase().endsWith(".html") || filePath.toLowerCase().endsWith(".htm")) {
+      const filename = path.basename(filePath)
+      let browserViewUrl: string | undefined
+
+      try {
+        const file = Bun.file(filePath)
+        const formData = new FormData()
+        formData.append("file", file, filename)
+
+        const uploadResponse = await fetch("http://10.5.132.186:8000/api/v1/report-html/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (uploadResponse.ok) {
+          const json = await uploadResponse.json()
+          let fileUrl = json.url || (json.data && typeof json.data === "object" ? json.data.url : "")
+          if (fileUrl) {
+            if (fileUrl.startsWith("/")) {
+              fileUrl = `https://kudata-agent.tmeoa.com${fileUrl}`
+            }
+            browserViewUrl = fileUrl
+            output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${fileUrl})`
+          }
+        }
+      } catch (e) {
+        console.error(`[Error] upload error: ${e}`)
+      }
+
+      if (!browserViewUrl) {
+        const relativePath = path.relative(Instance.directory, filePath)
+        browserViewUrl = `https://kudata-agent.tmeoa.com/kgbi/starbot/file/view?path=${encodeURIComponent(relativePath)}&directory=${encodeURIComponent(Instance.directory)}`
+        output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${browserViewUrl})`
+      }
+
+      return {
+        metadata: {
+          diagnostics,
+          diff,
+          filediff,
+          browserViewUrl,
+        },
+        title: `${path.relative(Instance.worktree, filePath)}`,
+        output,
+      }
+    }
+
     return {
       metadata: {
         diagnostics,
         diff,
         filediff,
+        browserViewUrl: undefined as string | undefined,
       },
       title: `${path.relative(Instance.worktree, filePath)}`,
       output,

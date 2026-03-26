@@ -31,6 +31,13 @@ export default function SkillsPage() {
     const [isPullingSkill, setIsPullingSkill] = createSignal<string | null>(null)
     const [isPublishingSkill, setIsPublishingSkill] = createSignal<string | null>(null)
 
+    // Publish Dialog State
+    const [publishModalOpen, setPublishModalOpen] = createSignal(false)
+    const [publishSkill, setPublishSkill] = createSignal<any>(null)
+    const [publishCommitMsg, setPublishCommitMsg] = createSignal("")
+    const [publishSuccessOpen, setPublishSuccessOpen] = createSignal(false)
+    const [publishBranchUrl, setPublishBranchUrl] = createSignal("")
+
     // KB Skill States
     const [kbModalOpen, setKbModalOpen] = createSignal(false)
     const [kbEngine, setKbEngine] = createSignal("presto")
@@ -61,17 +68,7 @@ export default function SkillsPage() {
         await globalSDK.client.instance.dispose({ directory: dir }).catch(() => undefined)
         await refetchLocal()
     }
-
-    const handleCreate = () => {
-        const dir = currentDir()
-        if (!dir) return
-
-        const promptString = language.t("skills.creator.prompt") + "\n"
-        sessionStorage.setItem("opencode.handoff.prompt", promptString)
-
-        const href = `/${base64Encode(dir)}/session`
-        navigate(href)
-    }
+ 
 
     const handleDelete = async (e: Event, skill: any) => {
         e.stopPropagation()
@@ -130,15 +127,19 @@ export default function SkillsPage() {
             }, 500)
         })
     }
-
-    const openUploadModal = (e: Event, skill: any) => {
+  
+    const handlePublishSkill = (e: Event, skill: any) => {
         e.stopPropagation()
-        setSelectedSkill(skill)
-        setUploadModalOpen(true)
+        setPublishSkill(skill)
+        setPublishCommitMsg("")
+        setPublishModalOpen(true)
     }
 
-    const handlePublishSkill = async (e: Event, skill: any) => {
-        e.stopPropagation()
+    const handleConfirmPublish = async () => {
+        const skill = publishSkill()
+        const msg = publishCommitMsg().trim()
+        if (!skill || !msg) return
+
         const dir = currentDir()
         if (!dir) return
 
@@ -149,17 +150,18 @@ export default function SkillsPage() {
             account = dir.split("/")[4]
         }
         if (!account) {
-            showToast({ title: "错误", description: "找不到可以执行账号", variant: "error" })
+            showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
         }
 
         const skillPath = skill.location.split("/").slice(0, -1).join("/")
+        setPublishModalOpen(false)
         setIsPublishingSkill(skill.name)
         try {
             const res = await fetch(`${globalSDK.url}/skill/publish?directory=${encodeURIComponent(dir)}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ directory: dir, name: account, skillPath }),
+                body: JSON.stringify({ directory: dir, name: account, skillPath, commitMessage: msg }),
             })
             if (!res.ok) {
                 const text = await res.text().catch(() => res.statusText)
@@ -169,14 +171,21 @@ export default function SkillsPage() {
             if (data.status === "no-git") {
                 setSelectedSkill(skill)
                 setUploadModalOpen(true)
-            } else if (data.status === "remote-ahead") {
-                showToast({ title: "发布失败", description: "市场有更新版本，请先刷新技能后再发布", variant: "error" })
+            } else if (data.status === "no-changes") {
+                showToast({ title: language.t("skills.push.noChanges.title"), description: language.t("skills.push.noChanges.description"), variant: "error" })
             } else if (data.status === "pushed") {
-                showToast({ title: "发布成功", description: `技能 ${skill.name} 已推送到远程` })
+                const url = data.branchUrl
+                if (url) {
+                    setPublishBranchUrl(url)
+                    setPublishSuccessOpen(true)
+                    showToast({ title: language.t("skills.push.success.title"), description: language.t("skills.push.success.description") })
+                } else {
+                    showToast({ title: language.t("skills.push.success.title"), description: language.t("skills.push.success.descriptionWithName", { name: skill.name }) })
+                }
             }
         } catch (err: any) {
             console.error(err)
-            showToast({ title: "发布失败", description: err.message, variant: "error" })
+            showToast({ title: language.t("skills.push.failed.title"), description: err.message, variant: "error" })
         } finally {
             setIsPublishingSkill(null)
         }
@@ -270,13 +279,11 @@ export default function SkillsPage() {
             account = 'xiaogenliu'
         }
         if (!account) {
-            showToast({ title: "错误", description: "找不到可以执行账号", variant: "error" })
+            showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
         }
 
-        console.log(account)
-
-        if (!confirm("刷新将会完全覆盖本地技能的修改，是否继续？")) return
+        if (!confirm(language.t("skills.pull.confirm"))) return
 
         const skillDir = skill.location.split("/").slice(0, -1).join("/")
         setIsPullingSkill(skill.name)
@@ -291,10 +298,10 @@ export default function SkillsPage() {
                 throw new Error(text)
             }
             await handleRefresh()
-            showToast({ title: "成功", description: `技能 ${skill.name} 已更新` })
+            showToast({ title: language.t("skills.pull.success.title"), description: language.t("skills.pull.success.description", { name: skill.name }) })
         } catch (err: any) {
             console.error(err)
-            showToast({ title: "刷新技能失败", description: err.message, variant: "error" })
+            showToast({ title: language.t("skills.pull.failed.title"), description: err.message, variant: "error" })
         } finally {
             setIsPullingSkill(null)
         }
@@ -312,7 +319,7 @@ export default function SkillsPage() {
             account = dir.split("/")[4]
         }
         if (!account) {
-            showToast({ title: "错误", description: "找不到可以执行账号", variant: "error" })
+            showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
         }
 
@@ -330,10 +337,10 @@ export default function SkillsPage() {
             setGitModalOpen(false)
             setGitUrl("")
             await handleRefresh()
-            showToast({ title: "成功", description: "技能仓库克隆完成" })
+            showToast({ title: language.t("skills.gitClone.success.title"), description: language.t("skills.gitClone.success.description") })
         } catch (e: any) {
             console.error(e)
-            showToast({ title: "获取技能失败", description: e.message, variant: "error" })
+            showToast({ title: language.t("skills.gitClone.failed.title"), description: e.message, variant: "error" })
         } finally {
             setIsCloning(false)
         }
@@ -353,7 +360,7 @@ export default function SkillsPage() {
                         </div>
                     </Button>
                     <Button variant="secondary" onClick={() => setGitModalOpen(true)}>
-                        获取技能
+                        {language.t("skills.gitClone.button")}
                     </Button>
                     <Button variant="primary" onClick={() => setKbModalOpen(true)}>
                         {language.t("skills.kb.create")}
@@ -373,10 +380,10 @@ export default function SkillsPage() {
                                                 <span class="text-16-medium text-text-strong">{skill.name}</span>
                                             </div>
                                             <div class="flex items-center gap-1">
-                                                <Tooltip value="刷新技能（覆盖本地修改）">
+                                                <Tooltip value={language.t("skills.pull.tooltip")}>
                                                     <div class="relative">
                                                         <IconButton
-                                                            icon="refresh"
+                                                            icon="download"
                                                             variant="ghost"
                                                             size="small"
                                                             class="text-text-weak hover:text-text-strong transition-colors"
@@ -600,17 +607,17 @@ export default function SkillsPage() {
                                 <Icon name="download" class="size-5" />
                             </div>
                             <div>
-                                <h2 class="text-16-medium text-text-strong">获取技能</h2>
-                                <p class="text-13-regular text-text-weak mt-1">输入 Git 仓库地址以克隆技能</p>
+                                <h2 class="text-16-medium text-text-strong">{language.t("skills.gitClone.modal.title")}</h2>
+                                <p class="text-13-regular text-text-weak mt-1">{language.t("skills.gitClone.modal.description")}</p>
                             </div>
                         </div>
 
                         <div class="mb-6">
-                            <label class="block text-14-medium text-text-strong mb-2">Git 地址</label>
+                            <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.gitClone.modal.urlLabel")}</label>
                             <input
                                 type="text"
                                 class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none"
-                                placeholder="https://cnb.tmeoa.com/kudata-skills/xxx.git"
+                                placeholder={language.t("skills.gitClone.modal.placeholder")}
                                 value={gitUrl()}
                                 onInput={(e) => setGitUrl(e.target.value)}
                             />
@@ -621,7 +628,88 @@ export default function SkillsPage() {
                                 {language.t("common.cancel")}
                             </Button>
                             <Button variant="primary" onClick={handleGitClone} disabled={isCloning() || !gitUrl().trim()}>
-                                {isCloning() ? "克隆中..." : "确定"}
+                                {isCloning() ? language.t("skills.gitClone.cloning") : language.t("skills.gitClone.confirm")}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
+
+            {/* Publish Commit Message Modal */}
+            <Show when={publishModalOpen()}>
+                <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm shadow-xl" onClick={() => setPublishModalOpen(false)}>
+                    <div class="w-full max-w-md bg-background-base rounded-xl border border-border-weak-base shadow-md p-6" onClick={(e) => e.stopPropagation()}>
+                        <div class="flex items-center gap-3 mb-6 border-b border-border-weak-base pb-4">
+                            <div class="flex items-center justify-center size-10 rounded-full bg-element-base text-icon-base shadow-sm">
+                                <Icon name="arrow-up" class="size-5" />
+                            </div>
+                            <div>
+                                <h2 class="text-16-medium text-text-strong">{language.t("skills.push.modal.title", { name: publishSkill()?.name })}</h2>
+                                <p class="text-13-regular text-text-weak mt-1">{language.t("skills.push.modal.description")}</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.push.commitMessage.label")} <span class="text-negative-base">*</span></label>
+                            <textarea
+                                class="w-full h-24 px-3 py-2 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none resize-none select-text"
+                                placeholder={language.t("skills.push.commitMessage.placeholder")}
+                                value={publishCommitMsg()}
+                                onInput={(e) => setPublishCommitMsg(e.target.value)}
+                            />
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-border-weak-base">
+                            <Button variant="ghost" onClick={() => setPublishModalOpen(false)}>
+                                {language.t("common.cancel")}
+                            </Button>
+                            <Button variant="primary" onClick={handleConfirmPublish} disabled={!publishCommitMsg().trim()}>
+                                {language.t("skills.push.confirm")}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
+
+            {/* Publish Success Dialog */}
+            <Show when={publishSuccessOpen()}>
+                <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm shadow-xl" onClick={() => setPublishSuccessOpen(false)}>
+                    <div class="w-full max-w-lg bg-background-base rounded-xl border border-border-weak-base shadow-md p-6" onClick={(e) => e.stopPropagation()}>
+                        <div class="flex items-center gap-3 mb-6 border-b border-border-weak-base pb-4">
+                            <div class="flex items-center justify-center size-10 rounded-full bg-element-active text-icon-base shadow-sm">
+                                <Icon name="check" class="size-5" />
+                            </div>
+                            <div>
+                                <h2 class="text-16-medium text-text-strong">{language.t("skills.push.success.dialog.title")}</h2>
+                                <p class="text-13-regular text-text-weak mt-1">{language.t("skills.push.success.dialog.description")}</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.push.success.dialog.reviewLink")}</label>
+                            <input
+                                type="text"
+                                class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong select-text"
+                                value={publishBranchUrl()}
+                                readonly
+                            />
+                            <p class="text-13-regular text-text-weak mt-3">
+                                {language.t("skills.push.success.dialog.reviewHint")}
+                            </p>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-border-weak-base">
+                            <Button variant="ghost" onClick={() => setPublishSuccessOpen(false)}>
+                                {language.t("skills.push.success.dialog.close")}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(publishBranchUrl())
+                                    showToast({ title: language.t("skills.push.toast.copied.title"), description: language.t("skills.push.toast.copied.description") })
+                                }}
+                            >
+                                {language.t("skills.push.success.dialog.copyLink")}
                             </Button>
                         </div>
                     </div>

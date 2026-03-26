@@ -73,19 +73,51 @@ export const WriteTool = Tool.define("write", {
     }
 
 
-     // Add browser view link for HTML files
-     if (filepath.toLowerCase().endsWith(".html") || filepath.toLowerCase().endsWith(".htm")) {
-      const relativePath = path.relative(Instance.directory, filepath)
-      const viewUrl = `https://kudata-agent.tmeoa.com/kgbi/starbot/file/view?path=${encodeURIComponent(relativePath)}&directory=${encodeURIComponent(Instance.directory)}`
+    // Add browser view link for HTML files
+    if (filepath.toLowerCase().endsWith(".html") || filepath.toLowerCase().endsWith(".htm")) {
       const filename = path.basename(filepath)
-      output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${viewUrl})`
+      let browserViewUrl: string | undefined
+
+      // Upload file to server and get HTTP URL
+      try {
+        const file = Bun.file(filepath)
+        const formData = new FormData()
+        formData.append("file", file, filename)
+
+        const uploadResponse = await fetch("http://10.5.132.186:8000/api/v1/report-html/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (uploadResponse.ok) {
+          const json = await uploadResponse.json()
+          let fileUrl = json.url || (json.data && typeof json.data === "object" ? json.data.url : "")
+          if (fileUrl) {
+            if (fileUrl.startsWith("/")) {
+              fileUrl = `https://kudata-agent.tmeoa.com${fileUrl}`
+            }
+            browserViewUrl = fileUrl
+            output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${fileUrl})`
+          }
+        }
+      } catch (e) {
+        console.error(`[Error] upload error: ${e}`)
+      }
+
+      // Fallback to local view URL if upload failed
+      if (!browserViewUrl) {
+        const relativePath = path.relative(Instance.directory, filepath)
+        browserViewUrl = `https://kudata-agent.tmeoa.com/kgbi/starbot/file/view?path=${encodeURIComponent(relativePath)}&directory=${encodeURIComponent(Instance.directory)}`
+        output += `\n\nYou should tell user the browser view url by markdown link: [${filename}](${browserViewUrl})`
+      }
+
       return {
         title: path.relative(Instance.worktree, filepath),
         metadata: {
           diagnostics,
           localPath: filepath,
           exists: exists,
-          browserViewUrl: viewUrl,
+          browserViewUrl,
         },
         output,
       }
