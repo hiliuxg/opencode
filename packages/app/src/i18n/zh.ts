@@ -93,6 +93,8 @@ export const dict = {
 
   "command.model.choose": "选择模型",
   "command.model.choose.description": "选择不同的模型",
+  "command.skill.choose": "选择技能",
+  "command.skill.choose.description": "选择要使用的技能",
 
   "command.mcp.toggle": "切换 MCPs",
   "command.mcp.toggle.description": "切换 MCPs",
@@ -148,6 +150,9 @@ export const dict = {
   "dialog.model.select.title": "选择模型",
   "dialog.model.search.placeholder": "搜索模型",
   "dialog.model.empty": "未找到模型",
+  "dialog.skill.select.title": "选择技能",
+  "dialog.skill.search.placeholder": "搜索技能",
+  "dialog.skill.empty": "暂无技能",
   "dialog.model.manage": "管理模型",
   "dialog.model.manage.description": "自定义模型选择器中显示的模型。",
   "dialog.model.unpaid.freeModels.title": "OpenCode 提供的免费模型",

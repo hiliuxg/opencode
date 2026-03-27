@@ -31,6 +31,7 @@ import { RadioGroup } from "@opencode-ai/ui/radio-group"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
+import { SkillSelectorPopover } from "@/components/dialog-select-skill"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
@@ -1306,7 +1307,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         variant="ghost"
                         size="normal"
                         class="min-w-0 max-w-[320px] text-13-regular group"
-                        style={{ height: "28px" }}
                         onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
                       >
                         <Show when={local.model.current()?.provider?.id}>
@@ -1335,7 +1335,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       triggerProps={{
                         variant: "ghost",
                         size: "normal",
-                        style: { height: "28px" },
                         class: "min-w-0 max-w-[320px] text-13-regular group",
                       }}
                     >
@@ -1353,6 +1352,27 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </ModelSelectorPopover>
                   </TooltipKeybind>
                 </Show>
+                <Tooltip
+                  placement="top"
+                  gutter={4}
+                  value={language.t("command.skill.choose")}
+                >
+                  <SkillSelectorPopover
+                    triggerAs={Button}
+                    triggerProps={{
+                      variant: "ghost",
+                      size: "normal",
+                      class: "min-w-0 max-w-[200px] text-13-regular group",
+                    }}
+                    onSelect={(skill) => local.skill.set(skill?.name)}
+                  >
+                    <span class="truncate">
+                      {local.skill.current() ?? language.t("dialog.skill.select.title")}
+                    </span>
+                    <Icon name="chevron-down" size="small" class="shrink-0" />
+                  </SkillSelectorPopover>
+                </Tooltip>
+                {/*
                 <TooltipKeybind
                   placement="top"
                   gutter={4}
@@ -1371,37 +1391,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     variant="ghost"
                   />
                 </TooltipKeybind>
+                */}
               </Show>
-            </div>
-            <div class="shrink-0">
-              <RadioGroup
-                options={["shell", "normal"] as const}
-                current={store.mode}
-                value={(mode) => mode}
-                label={(mode) => (
-                  <TooltipKeybind
-                    placement="top"
-                    gutter={4}
-                    openDelay={2000}
-                    title={language.t(mode === "shell" ? "prompt.mode.shell" : "prompt.mode.normal")}
-                    keybind={command.keybind(mode === "shell" ? "prompt.mode.shell" : "prompt.mode.normal")}
-                    class="size-full flex items-center justify-center"
-                  >
-                    <Icon
-                      name={mode === "shell" ? "console" : "prompt"}
-                      class="size-[18px]"
-                      classList={{
-                        "text-icon-strong-base": store.mode === mode,
-                        "text-icon-weak": store.mode !== mode,
-                      }}
-                    />
-                  </TooltipKeybind>
-                )}
-                onSelect={(mode) => mode && setMode(mode)}
-                fill
-                pad="none"
-                class="w-[68px]"
-              />
             </div>
           </div>
         </DockTray>

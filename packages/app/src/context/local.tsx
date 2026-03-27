@@ -232,10 +232,23 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
     })()
 
+    const skill = (() => {
+      const [store, setStore] = createStore<{ current?: string }>({})
+      return {
+        current() {
+          return store.current
+        },
+        set(name: string | undefined) {
+          setStore("current", name)
+        },
+      }
+    })()
+
     const result = {
       slug: createMemo(() => base64Encode(sdk.directory)),
       model,
       agent,
+      skill,
     }
     return result
   },
