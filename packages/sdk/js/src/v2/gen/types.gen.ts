@@ -4099,6 +4099,39 @@ export type FileDownloadResponses = {
 
 export type FileDownloadResponse = FileDownloadResponses[keyof FileDownloadResponses]
 
+export type FileViewData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    /**
+     * Absolute path to the file to view
+     */
+    path: string
+  }
+  url: "/file/view"
+}
+
+export type FileViewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type FileViewError = FileViewErrors[keyof FileViewErrors]
+
+export type FileViewResponses = {
+  /**
+   * File content rendered in browser
+   */
+  200: unknown
+}
+
 export type McpStatusData = {
   body?: never
   path?: never
@@ -4832,6 +4865,7 @@ export type SkillPublishData = {
     directory: string
     name: string
     skillPath: string
+    commitMessage: string
   }
   path?: never
   query?: {
@@ -4854,7 +4888,8 @@ export type SkillPublishResponses = {
    * Publish result
    */
   200: {
-    status: "no-git" | "remote-ahead" | "pushed"
+    status: "no-git" | "no-changes" | "pushed"
+    branchUrl?: string
   }
 }
 

@@ -499,9 +499,9 @@ export const SettingsGeneral: Component = () => {
               </div>
             )
           }}
-        </Show>*/}
+        </Show>
 
-        <UpdatesSection />
+        <UpdatesSection /> */}
 
         <Show when={linux()}>
           {(_) => {

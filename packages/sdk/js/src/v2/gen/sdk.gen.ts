@@ -33,6 +33,8 @@ import type {
   FilePartSource,
   FileReadResponses,
   FileStatusResponses,
+  FileViewErrors,
+  FileViewResponses,
   FileWriteResponses,
   FindFilesResponses,
   FindSymbolsResponses,
@@ -2535,6 +2537,36 @@ export class File extends HeyApiClient {
       ...params,
     })
   }
+
+  /**
+   * View file in browser
+   *
+   * View file content directly in browser. Supports HTML (rendered), PDF (inline), and text files.
+   */
+  public view<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FileViewResponses, FileViewErrors, ThrowOnError>({
+      url: "/file/view",
+      ...options,
+      ...params,
+    })
+  }
 }
 
 export class Auth2 extends HeyApiClient {
@@ -3410,7 +3442,7 @@ export class Skill extends HeyApiClient {
   /**
    * Publish skill to git remote
    *
-   * Check git status and push local skill changes to the remote repository.
+   * Check git status and push local skill changes to the remote repository on a new branch.
    */
   public publish<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -3418,6 +3450,7 @@ export class Skill extends HeyApiClient {
       body_directory?: string
       name?: string
       skillPath?: string
+      commitMessage?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3438,6 +3471,7 @@ export class Skill extends HeyApiClient {
             },
             { in: "body", key: "name" },
             { in: "body", key: "skillPath" },
+            { in: "body", key: "commitMessage" },
           ],
         },
       ],
