@@ -1101,6 +1101,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onRemove={removeImageAttachment}
           removeLabel={language.t("prompt.attachment.remove")}
         />
+        <Show when={store.mode === "normal" && local.skill.current()}>
+          <div class="flex flex-nowrap items-center gap-2 px-3 pt-2">
+            <div class="group shrink-0 flex items-center gap-1 h-6 rounded-full pl-2 pr-1 max-w-[200px] bg-background-stronger shadow-xs-border hover:shadow-xs-border-hover transition-all cursor-default">
+              <Icon name="brain" size="small" class="shrink-0 size-3 text-text-weak" />
+              <span class="truncate text-11-regular text-text-strong font-medium">{local.skill.current()}</span>
+              <IconButton
+                type="button"
+                icon="close-small"
+                variant="ghost"
+                class="size-3.5 text-text-weak hover:text-text-strong transition-all"
+                onClick={() => local.skill.set(undefined)}
+                aria-label={language.t("prompt.attachment.remove")}
+              />
+            </div>
+          </div>
+        </Show>
         <div
           class="relative"
           onMouseDown={(e) => {
@@ -1366,9 +1382,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     }}
                     onSelect={(skill) => local.skill.set(skill?.name)}
                   >
-                    <span class="truncate">
-                      {local.skill.current() ?? language.t("dialog.skill.select.title")}
-                    </span>
+                    <span class="truncate">{language.t("dialog.skill.select.title")}</span>
                     <Icon name="chevron-down" size="small" class="shrink-0" />
                   </SkillSelectorPopover>
                 </Tooltip>

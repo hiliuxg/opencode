@@ -222,6 +222,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       prompt.reset()
       input.setMode("normal")
       input.setPopover(null)
+      local.skill.set(undefined)
     }
 
     const restoreInput = () => {
@@ -292,12 +293,15 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const context = prompt.context.items().slice()
     const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
 
+    const skill = local.skill.current()
+    const finalText = skill ? `使用\`${skill}\` 技能回答问题 \n\n${text}` : text
+
     const messageID = Identifier.ascending("message")
     const { requestParts, optimisticParts } = buildRequestParts({
       prompt: currentPrompt,
       context,
       images,
-      text,
+      text: finalText,
       sessionID: session.id,
       messageID,
       sessionDirectory,
