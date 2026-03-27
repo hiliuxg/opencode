@@ -35,8 +35,8 @@ export const SettingsModels: Component = () => {
   const language = useLanguage()
   const models = useModels()
 
-  const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.list(),
+    const list = useFilteredList<ModelItem>({
+    items: (_filter) => models.list().filter((x) => x.provider.id !== "opencode"),
     key: (x) => `${x.provider.id}:${x.id}`,
     filterKeys: ["provider.name", "name", "id"],
     sortBy: (a, b) => a.name.localeCompare(b.name),
