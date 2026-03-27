@@ -248,7 +248,7 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         icon: "bubble-5",
         title: i18n.t("ui.tool.questions"),
       }
-    case "kudata-mcp_run_select_query":
+    case "kudata-mcp_sql_query_result":
       return {
         icon: "mcp",
         title: i18n.t("ui.tool.mcp.run_query"),
@@ -1878,7 +1878,7 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
-  name: "kudata-mcp_run_select_query",
+  name: "kudata-mcp_sql_query_result",
   render(props) {
     const i18n = useI18n()
     const codeComponent = useCodeComponent()
