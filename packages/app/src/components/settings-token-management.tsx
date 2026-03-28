@@ -239,6 +239,8 @@ export const SettingsTokenManagement = () => {
         content: configContent,
       })
 
+      await sdk.client.instance.dispose({ directory: dir }).catch(() => undefined)
+
       showToast({
         title: configExists()
           ? language.t("settings.tokenManagement.updateSuccess")
@@ -315,6 +317,7 @@ export const SettingsTokenManagement = () => {
               <div class="flex items-center justify-end gap-2">
                 <Button
                   variant="primary"
+                  icon={isSaving() ? undefined : "check"}
                   onClick={handleSaveToken}
                   disabled={isSaving() || !tokenInput().trim()}
                 >

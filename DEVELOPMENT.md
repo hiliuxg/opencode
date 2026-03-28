@@ -214,6 +214,7 @@ opencode-app-2251:latest
 
 # 上一个版本 opencode-v125-03152153 
 # 上一个版本 opencode-v125-03252302
+# 上一个版本 opencode-v125-03262334 
 
 # 前端构建
 cd packages/app & bun run build 
@@ -225,14 +226,14 @@ cd
 export OPENCODE_BASE_PATH=/kgbi/starbot
 
 docker buildx build --platform linux/amd64 \
-      -t opencode-v125-03262334 \
+      -t opencode-v125-03282001 \
       --load \
       . 
 
-docker save -o opencode-v125-03262334.tar opencode-v125-03262334
+docker save -o opencode-v125-03282001.tar opencode-v125-03282001
 
  
-sudo  docker load -i opencode-v125-03262334.tar
+sudo  docker load -i opencode-v125-03282001.tar
  
 sudo docker run  -d \
   -p 4096:4096 \
@@ -244,7 +245,7 @@ sudo docker run  -d \
   -v /data1/opencode:/home \
   -v /data1/opencode/base/config:/root/.config/opencode \
   -v /data1/opencode/base/local:/root/.local \
-  opencode-v125-03262334 \
+  opencode-v125-03282001 \
   --print-logs serve --hostname 0.0.0.0 --cors * --log-level DEBUG  
 
 
