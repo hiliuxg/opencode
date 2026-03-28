@@ -720,7 +720,7 @@ export namespace SessionPrompt {
         const hasReasoning = responseParts.some((part) => part.type === "reasoning" && !!part.text.trim())
         if (!hasToolCall && !hasText && !hasReasoning) {
           processor.message.error = new NamedError.Unknown({
-            message: "Upstream model returned an empty response. Please switch to another model and try again.",
+            message: "该模型可能没有token额度了，请切换到另一个模型重试，或者打开左下角的`设置` -> `令牌管理` 页面，更新令牌。",
           }).toObject()
           await Session.updateMessage(processor.message)
           break

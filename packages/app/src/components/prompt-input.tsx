@@ -20,10 +20,8 @@ import { useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 import { useComments } from "@/context/comments"
 import { Button } from "@opencode-ai/ui/button"
-import { DockShellForm, DockTray } from "@opencode-ai/ui/dock-surface"
+import { DockShellForm } from "@opencode-ai/ui/dock-surface"
 import { Icon } from "@opencode-ai/ui/icon"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import type { IconName } from "@opencode-ai/ui/icons/provider"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
@@ -741,7 +739,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     if (!shellMode) {
       const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
-      const slashMatch = rawText.match(/^\/(\S*)$/)
+      const slashMatch = null
 
       if (atMatch) {
         atOnInput(atMatch[1])
@@ -1154,7 +1152,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onKeyDown={handleKeyDown}
               classList={{
                 "select-text": true,
-                "w-full pl-3 pr-2 pt-2 pb-11 text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap": true,
+                "w-full pl-3 pr-2 pt-3 pb-3 text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap min-h-[60px]": true,
                 "[&_[data-type=file]]:text-syntax-property": true,
                 "[&_[data-type=agent]]:text-syntax-type": true,
                 "font-mono!": store.mode === "shell",
@@ -1162,7 +1160,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             />
             <Show when={!prompt.dirty()}>
               <div
-                class="absolute top-0 inset-x-0 pl-3 pr-2 pt-2 pb-11 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate"
+                class="absolute top-0 inset-x-0 pl-3 pr-2 pt-3 pb-3 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate"
                 classList={{ "font-mono!": store.mode === "shell" }}
               >
                 {placeholder()}
@@ -1170,120 +1168,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             </Show>
           </div>
 
-          <div class="pointer-events-none absolute bottom-2 right-2 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_FILE_TYPES.join(",")}
-              class="hidden"
-              onChange={(e) => {
-                const file = e.currentTarget.files?.[0]
-                if (file) addImageAttachment(file)
-                e.currentTarget.value = ""
-              }}
-            />
-
-            <div
-              aria-hidden={store.mode !== "normal"}
-              class="flex items-center gap-1 transition-all duration-200 ease-out"
-              classList={{
-                "opacity-100 translate-y-0 scale-100 pointer-events-auto": store.mode === "normal",
-                "opacity-0 translate-y-2 scale-95 pointer-events-none": store.mode !== "normal",
-              }}
-            >
-              <TooltipKeybind
-                placement="top"
-                title={language.t("prompt.action.attachFile")}
-                keybind={command.keybind("file.attach")}
-              >
-                <Button
-                  data-action="prompt-attach"
-                  type="button"
-                  variant="ghost"
-                  class="size-8 p-0"
-                  onClick={pick}
-                  disabled={store.mode !== "normal"}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  aria-label={language.t("prompt.action.attachFile")}
-                >
-                  <Icon name="plus" class="size-4.5" />
-                </Button>
-              </TooltipKeybind>
-
-              <Tooltip
-                placement="top"
-                inactive={!prompt.dirty() && !working()}
-                value={
-                  <Switch>
-                    <Match when={working()}>
-                      <div class="flex items-center gap-2">
-                        <span>{language.t("prompt.action.stop")}</span>
-                        <span class="text-icon-base text-12-medium text-[10px]!">{language.t("common.key.esc")}</span>
-                      </div>
-                    </Match>
-                    <Match when={true}>
-                      <div class="flex items-center gap-2">
-                        <span>{language.t("prompt.action.send")}</span>
-                        <Icon name="enter" size="small" class="text-icon-base" />
-                      </div>
-                    </Match>
-                  </Switch>
-                }
-              >
-                <IconButton
-                  data-action="prompt-submit"
-                  type="submit"
-                  disabled={store.mode !== "normal" || (!prompt.dirty() && !working() && commentCount() === 0)}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  icon={working() ? "stop" : "arrow-up"}
-                  variant="primary"
-                  class="size-8"
-                  aria-label={working() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
-                />
-              </Tooltip>
-            </div>
-          </div>
-
-          <Show when={store.mode === "normal" && permission.permissionsEnabled() && params.id}>
-            <div class="pointer-events-none absolute bottom-2 left-2">
-              <div class="pointer-events-auto">
-                <TooltipKeybind
-                  placement="top"
-                  gutter={8}
-                  title={language.t("command.permissions.autoaccept.enable")}
-                  keybind={command.keybind("permissions.autoaccept")}
-                >
-                  <Button
-                    data-action="prompt-permissions"
-                    variant="ghost"
-                    onClick={() => permission.toggleAutoAccept(params.id!, sdk.directory)}
-                    classList={{
-                      "_hidden group-hover/prompt-input:flex size-6 items-center justify-center": true,
-                      "text-text-base": !permission.isAutoAccepting(params.id!, sdk.directory),
-                      "hover:bg-surface-success-base": permission.isAutoAccepting(params.id!, sdk.directory),
-                    }}
-                    aria-label={
-                      permission.isAutoAccepting(params.id!, sdk.directory)
-                        ? language.t("command.permissions.autoaccept.disable")
-                        : language.t("command.permissions.autoaccept.enable")
-                    }
-                    aria-pressed={permission.isAutoAccepting(params.id!, sdk.directory)}
-                  >
-                    <Icon
-                      name="chevron-double-right"
-                      size="small"
-                      classList={{ "text-icon-success-base": permission.isAutoAccepting(params.id!, sdk.directory) }}
-                    />
-                  </Button>
-                </TooltipKeybind>
-              </div>
-            </div>
-          </Show>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_FILE_TYPES.join(",")}
+            class="hidden"
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0]
+              if (file) addImageAttachment(file)
+              e.currentTarget.value = ""
+            }}
+          />
         </div>
-      </DockShellForm>
-      <Show when={store.mode === "normal" || store.mode === "shell"}>
-        <DockTray attach="top">
-          <div class="px-1.75 pt-5.5 pb-2 flex items-center gap-2 min-w-0">
+        <Show when={store.mode === "normal" || store.mode === "shell"}>
+          <div class="px-2 pb-2 flex items-center gap-2 min-w-0">
             <div class="flex items-center gap-1.5 min-w-0 flex-1">
               <Show when={store.mode === "shell"}>
                 <div class="h-7 flex items-center gap-1.5 max-w-[160px] min-w-0" style={{ padding: "0 4px 0 8px" }}>
@@ -1325,13 +1223,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         class="min-w-0 max-w-[320px] text-13-regular group"
                         onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
                       >
-                        <Show when={local.model.current()?.provider?.id}>
-                          <ProviderIcon
-                            id={local.model.current()!.provider.id as IconName}
-                            class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                            style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                          />
-                        </Show>
                         <span class="truncate">
                           {local.model.current()?.name ?? language.t("dialog.model.select.title")}
                         </span>
@@ -1354,13 +1245,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         class: "min-w-0 max-w-[320px] text-13-regular group",
                       }}
                     >
-                      <Show when={local.model.current()?.provider?.id}>
-                        <ProviderIcon
-                          id={local.model.current()!.provider.id as IconName}
-                          class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                          style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                        />
-                      </Show>
                       <span class="truncate">
                         {local.model.current()?.name ?? language.t("dialog.model.select.title")}
                       </span>
@@ -1386,31 +1270,92 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <Icon name="chevron-down" size="small" class="shrink-0" />
                   </SkillSelectorPopover>
                 </Tooltip>
-                {/*
-                <TooltipKeybind
-                  placement="top"
-                  gutter={4}
-                  title={language.t("command.model.variant.cycle")}
-                  keybind={command.keybind("model.variant.cycle")}
-                >
-                  <Select
-                    size="normal"
-                    options={variants()}
-                    current={local.model.variant.current() ?? "default"}
-                    label={(x) => (x === "default" ? language.t("common.default") : x)}
-                    onSelect={(x) => local.model.variant.set(x === "default" ? undefined : x)}
-                    class="capitalize max-w-[160px]"
-                    valueClass="truncate text-13-regular"
-                    triggerStyle={{ height: "28px" }}
-                    variant="ghost"
-                  />
-                </TooltipKeybind>
-                */}
               </Show>
             </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <Show when={store.mode === "normal" && permission.permissionsEnabled() && params.id}>
+                <TooltipKeybind
+                  placement="top"
+                  gutter={8}
+                  title={language.t("command.permissions.autoaccept.enable")}
+                  keybind={command.keybind("permissions.autoaccept")}
+                >
+                  <Button
+                    data-action="prompt-permissions"
+                    variant="ghost"
+                    onClick={() => permission.toggleAutoAccept(params.id!, sdk.directory)}
+                    classList={{
+                      "size-7 flex items-center justify-center": true,
+                      "text-text-base": !permission.isAutoAccepting(params.id!, sdk.directory),
+                      "hover:bg-surface-success-base": permission.isAutoAccepting(params.id!, sdk.directory),
+                    }}
+                    aria-label={
+                      permission.isAutoAccepting(params.id!, sdk.directory)
+                        ? language.t("command.permissions.autoaccept.disable")
+                        : language.t("command.permissions.autoaccept.enable")
+                    }
+                    aria-pressed={permission.isAutoAccepting(params.id!, sdk.directory)}
+                  >
+                    <Icon
+                      name="chevron-double-right"
+                      size="small"
+                      classList={{ "text-icon-success-base": permission.isAutoAccepting(params.id!, sdk.directory) }}
+                    />
+                  </Button>
+                </TooltipKeybind>
+              </Show>
+              <Show when={store.mode === "normal"}>
+                <TooltipKeybind
+                  placement="top"
+                  title={language.t("prompt.action.attachFile")}
+                  keybind={command.keybind("file.attach")}
+                >
+                  <Button
+                    data-action="prompt-attach"
+                    type="button"
+                    variant="ghost"
+                    class="size-8 p-0"
+                    onClick={pick}
+                    aria-label={language.t("prompt.action.attachFile")}
+                  >
+                    <Icon name="plus" class="size-4.5" />
+                  </Button>
+                </TooltipKeybind>
+              </Show>
+              <Tooltip
+                placement="top"
+                inactive={!prompt.dirty() && !working()}
+                value={
+                  <Switch>
+                    <Match when={working()}>
+                      <div class="flex items-center gap-2">
+                        <span>{language.t("prompt.action.stop")}</span>
+                        <span class="text-icon-base text-12-medium text-[10px]!">{language.t("common.key.esc")}</span>
+                      </div>
+                    </Match>
+                    <Match when={true}>
+                      <div class="flex items-center gap-2">
+                        <span>{language.t("prompt.action.send")}</span>
+                        <Icon name="enter" size="small" class="text-icon-base" />
+                      </div>
+                    </Match>
+                  </Switch>
+                }
+              >
+                <IconButton
+                  data-action="prompt-submit"
+                  type="submit"
+                  disabled={!prompt.dirty() && !working() && commentCount() === 0}
+                  icon={working() ? "stop" : "arrow-up"}
+                  variant="primary"
+                  class="size-8"
+                  aria-label={working() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
+                />
+              </Tooltip>
+            </div>
           </div>
-        </DockTray>
-      </Show>
+        </Show>
+      </DockShellForm>
     </div>
   )
 }
