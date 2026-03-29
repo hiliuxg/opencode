@@ -413,6 +413,7 @@ export const dict = {
   "skills.pull.failed.title": "拉取失败",
   "skills.download": "下载到本地",
   "skills.gitClone.button": "获取技能",
+  "skills.market.web": "技能市场",
   "skills.market.title": "获取技能",
   "skills.market.description": "从技能市场选择一项或多项，将克隆到当前项目。单击一行可选中或取消选中。",
   "skills.market.cloneSuccess": "已成功克隆 {{count}} 个技能",

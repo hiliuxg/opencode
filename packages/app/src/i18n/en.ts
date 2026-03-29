@@ -396,6 +396,7 @@ export const dict = {
   "skills.pull.failed.title": "Pull failed",
   "skills.download": "Download",
   "skills.gitClone.button": "Get Skill",
+  "skills.market.web": "Skill Market",
   "skills.market.title": "Get Skill",
   "skills.market.description": "Choose one or more skills from the marketplace to clone into this project. Click a row to select or deselect.",
   "skills.market.cloneSuccess": "Successfully cloned {{count}} skills",

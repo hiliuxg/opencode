@@ -451,6 +451,12 @@ export default function SkillsPage() {
                 <div class="flex items-center gap-2">
                     <Button
                         variant="secondary"
+                        onClick={() => window.open("https://kudata-agent.tmeoa.com/skill-market", "_blank")}
+                    >
+                        {language.t("skills.market.web")}
+                    </Button>
+                    <Button
+                        variant="secondary"
                         onClick={handleRefresh}
                     >
                         <div class="flex items-center gap-2">
