@@ -122,16 +122,15 @@ export const WriteTool = Tool.define("write", {
         output,
       }
     }
-    else {
-      return {
-        title: path.relative(Instance.worktree, filepath),
-        metadata: {
-          diagnostics,
-          filepath,
-          exists: exists,
-        },
-        output,
-      }
+    return {
+      title: path.relative(Instance.worktree, filepath),
+      metadata: {
+        diagnostics,
+        localPath: filepath,
+        exists: exists,
+        browserViewUrl: "",
+      },
+      output,
     }
     
   },
