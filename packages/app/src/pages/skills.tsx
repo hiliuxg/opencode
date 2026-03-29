@@ -12,6 +12,9 @@ import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 
+/** 创建技能表单：业务领域「其他」选项的内部值（prompt 中替换为 i18n 文案） */
+const KB_CATALOG_OTHER = "__kb_catalog_other__"
+
 export default function SkillsPage() {
     const params = useParams()
     const globalSDK = useGlobalSDK()
@@ -279,11 +282,15 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
+        const catalogLabel =
+            kbCatalog() === KB_CATALOG_OTHER ? language.t("skills.kb.form.catalog.other") : kbCatalog()
+        const account = accountFromWorkspaceDir(dir) ?? language.t("skills.kb.form.account.unknown")
         const promptString = language.t("skills.kb.creator.prompt", {
+            account,
             engine: kbEngine(),
             cluster: kbCluster(),
             tables: kbTables().join(", "),
-            catalog: kbCatalog(),
+            catalog: catalogLabel,
             purpose: kbPurpose()
         }) + "\n"
         sessionStorage.setItem("opencode.handoff.prompt", promptString)
@@ -589,7 +596,7 @@ export default function SkillsPage() {
                             <div>
                                 <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.kb.form.catalog")}</label>
                                 <div class="flex flex-wrap gap-2">
-                                    {["AIK", "会员", "长音频", "规模", "直播"].map((cat) => (
+                                    {(["AIK", "会员", "长音频", "规模", "直播", KB_CATALOG_OTHER] as const).map((cat) => (
                                         <button
                                             class={`px-4 py-2 rounded-lg text-14-medium border transition-all ${kbCatalog() === cat
                                                 ? "bg-element-active border-element-active text-text-strong shadow-sm"
@@ -597,7 +604,7 @@ export default function SkillsPage() {
                                                 }`}
                                             onClick={() => setKbCatalog(cat)}
                                         >
-                                            {cat}
+                                            {cat === KB_CATALOG_OTHER ? language.t("skills.kb.form.catalog.other") : cat}
                                         </button>
                                     ))}
                                 </div>
