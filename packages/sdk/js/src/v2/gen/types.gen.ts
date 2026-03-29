@@ -3984,6 +3984,27 @@ export type FindSymbolsResponses = {
 
 export type FindSymbolsResponse = FindSymbolsResponses[keyof FindSymbolsResponses]
 
+export type FileDeleteData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    path: string
+  }
+  url: "/file"
+}
+
+export type FileDeleteResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+  }
+}
+
+export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
+
 export type FileListData = {
   body?: never
   path?: never
@@ -4002,27 +4023,6 @@ export type FileListResponses = {
 }
 
 export type FileListResponse = FileListResponses[keyof FileListResponses]
-
-export type FileDeleteData = {
-  body?: never
-  path?: never
-  query: {
-    directory?: string
-    path: string
-  }
-  url: "/file/content"
-}
-
-export type FileDeleteResponses = {
-  /**
-   * Success
-   */
-  200: {
-    success: boolean
-  }
-}
-
-export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
 
 export type FileReadData = {
   body?: never
@@ -4794,6 +4794,40 @@ export type AppAgentsResponses = {
 
 export type AppAgentsResponse = AppAgentsResponses[keyof AppAgentsResponses]
 
+export type SkillReposData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/skill/repos"
+}
+
+export type SkillReposErrors = {
+  /**
+   * Marketplace not configured
+   */
+  503: {
+    message: string
+  }
+}
+
+export type SkillReposError = SkillReposErrors[keyof SkillReposErrors]
+
+export type SkillReposResponses = {
+  /**
+   * Marketplace repositories
+   */
+  200: Array<{
+    id: string
+    name: string
+    description: string
+    web_url: string
+  }>
+}
+
+export type SkillReposResponse = SkillReposResponses[keyof SkillReposResponses]
+
 export type SkillCloneData = {
   body?: {
     directory: string
@@ -4860,7 +4894,7 @@ export type SkillPullResponses = {
 
 export type SkillPullResponse = SkillPullResponses[keyof SkillPullResponses]
 
-export type SkillPublishData = {
+export type SkillPushData = {
   body?: {
     directory: string
     name: string
@@ -4871,21 +4905,21 @@ export type SkillPublishData = {
   query?: {
     directory?: string
   }
-  url: "/skill/publish"
+  url: "/skill/push"
 }
 
-export type SkillPublishErrors = {
+export type SkillPushErrors = {
   /**
    * Bad request
    */
   400: BadRequestError
 }
 
-export type SkillPublishError = SkillPublishErrors[keyof SkillPublishErrors]
+export type SkillPushError = SkillPushErrors[keyof SkillPushErrors]
 
-export type SkillPublishResponses = {
+export type SkillPushResponses = {
   /**
-   * Publish result
+   * Push result
    */
   200: {
     status: "no-git" | "no-changes" | "pushed"
@@ -4893,7 +4927,7 @@ export type SkillPublishResponses = {
   }
 }
 
-export type SkillPublishResponse = SkillPublishResponses[keyof SkillPublishResponses]
+export type SkillPushResponse = SkillPushResponses[keyof SkillPushResponses]
 
 export type AppSkillsData = {
   body?: never

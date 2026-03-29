@@ -147,6 +147,48 @@ export const FileRoutes = lazy(() =>
         return c.json(content)
       },
     )
+    .delete(
+      "/file",
+      describeRoute({
+        summary: "Delete file or directory",
+        description:
+          "Delete a specified file or directory from the project. If `path` points to a file, only that file is removed; if it points to a directory, the directory and all of its contents are removed. Use the `directory` query parameter to select the project instance, consistent with other file routes.",
+        operationId: "file.delete",
+        responses: {
+          200: {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ success: z.boolean() })),
+              },
+            },
+          },
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          directory: z.string().optional(),
+          path: z.string(),
+        }),
+      ),
+      async (c) => {
+        const query = c.req.valid("query")
+        const full = nodePath.resolve(Instance.directory, query.path)
+        if (!Instance.containsPath(full)) {
+          return c.json({ error: "Access denied: path escapes project directory" }, 403)
+        }
+        const root = nodePath.resolve(Instance.directory)
+        if (full === root) {
+          return c.json({ error: "Cannot delete project root directory" }, 400)
+        }
+        if (!(await Filesystem.exists(full))) {
+          return c.json({ error: "Path not found" }, 404)
+        }
+        await fs.promises.rm(full, { recursive: true })
+        return c.json({ success: true })
+      },
+    )
     .get(
       "/file/content",
       describeRoute({
@@ -226,39 +268,6 @@ export const FileRoutes = lazy(() =>
         const query = c.req.valid("query")
         const body = c.req.valid("json")
         await File.write(query.path, body.content)
-        return c.json({ success: true })
-      },
-    )
-    .delete(
-      "/file/content",
-      describeRoute({
-        summary: "Delete file",
-        description: "Delete a specified file from the project.",
-        operationId: "file.delete",
-        responses: {
-          200: {
-            description: "Success",
-            content: {
-              "application/json": {
-                schema: resolver(z.object({ success: z.boolean() })),
-              },
-            },
-          },
-        },
-      }),
-      validator(
-        "query",
-        z.object({
-          path: z.string(),
-        }),
-      ),
-      async (c) => {
-        const filePath = c.req.valid("query").path
-        const full = nodePath.resolve(Instance.directory, filePath)
-        if (!Instance.containsPath(full)) {
-          return c.json({ error: "Access denied: path escapes project directory" }, 403)
-        }
-        await fs.promises.unlink(full)
         return c.json({ success: true })
       },
     )

@@ -224,6 +224,7 @@ cd
 
 
 export OPENCODE_BASE_PATH=/kgbi/starbot
+export OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB
 
 docker buildx build --platform linux/amd64 \
       -t opencode-v125-03282001 \
@@ -239,6 +240,7 @@ sudo docker run  -d \
   -p 4096:4096 \
   -e OPENCODE_ACCESS_GRANTS=/root/.config/opencode/grants.json \
   -e OPENCODE_BASE_PATH=/kgbi/starbot \
+  -e OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB \
   -e OPENCODE_DISABLE_MODELS_FETCH=true \
   -e OPENCODE_DISABLE_DEFAULT_PLUGINS=true \
   -e OPENCODE_DISABLE_LSP_DOWNLOAD=true \

@@ -150,10 +150,12 @@ import type {
   SessionUpdateResponses,
   SkillCloneErrors,
   SkillCloneResponses,
-  SkillPublishErrors,
-  SkillPublishResponses,
   SkillPullErrors,
   SkillPullResponses,
+  SkillPushErrors,
+  SkillPushResponses,
+  SkillReposErrors,
+  SkillReposResponses,
   SubtaskPartInput,
   TextPartInput,
   ToolIdsErrors,
@@ -2363,6 +2365,36 @@ export class Find extends HeyApiClient {
 
 export class File extends HeyApiClient {
   /**
+   * Delete file or directory
+   *
+   * Delete a specified file or directory from the project. If `path` points to a file, only that file is removed; if it points to a directory, the directory and all of its contents are removed. Use the `directory` query parameter to select the project instance, consistent with other file routes.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<FileDeleteResponses, unknown, ThrowOnError>({
+      url: "/file",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * List files
    *
    * List files and directories in a specified path.
@@ -2387,36 +2419,6 @@ export class File extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<FileListResponses, unknown, ThrowOnError>({
       url: "/file",
-      ...options,
-      ...params,
-    })
-  }
-
-  /**
-   * Delete file
-   *
-   * Delete a specified file from the project.
-   */
-  public delete<ThrowOnError extends boolean = false>(
-    parameters: {
-      directory?: string
-      path: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "query", key: "directory" },
-            { in: "query", key: "path" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).delete<FileDeleteResponses, unknown, ThrowOnError>({
-      url: "/file/content",
       ...options,
       ...params,
     })
@@ -3346,6 +3348,25 @@ export class App extends HeyApiClient {
 
 export class Skill extends HeyApiClient {
   /**
+   * List skill marketplace repositories
+   *
+   * Fetches the full skill marketplace repo list from the configured HTTP API by paging with page and page_size until all rows are loaded. Requires OPENCODE_SKILL_MARKET_TOKEN; optional OPENCODE_SKILL_MARKET_REPOS_URL and OPENCODE_SKILL_MARKET_PAGE_SIZE.
+   */
+  public repos<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<SkillReposResponses, SkillReposErrors, ThrowOnError>({
+      url: "/skill/repos",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Clone skill from git
    *
    * Clone a skill repository from a git URL into the .opencode/skills directory.
@@ -3440,11 +3461,11 @@ export class Skill extends HeyApiClient {
   }
 
   /**
-   * Publish skill to git remote
+   * Push skill to git remote
    *
    * Check git status and push local skill changes to the remote repository on a new branch.
    */
-  public publish<ThrowOnError extends boolean = false>(
+  public push<ThrowOnError extends boolean = false>(
     parameters?: {
       query_directory?: string
       body_directory?: string
@@ -3476,8 +3497,8 @@ export class Skill extends HeyApiClient {
         },
       ],
     )
-    return (options?.client ?? this.client).post<SkillPublishResponses, SkillPublishErrors, ThrowOnError>({
-      url: "/skill/publish",
+    return (options?.client ?? this.client).post<SkillPushResponses, SkillPushErrors, ThrowOnError>({
+      url: "/skill/push",
       ...options,
       ...params,
       headers: {

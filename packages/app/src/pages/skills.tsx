@@ -1,4 +1,4 @@
-import { createResource, createEffect, For, Show, Suspense, createSignal, onCleanup } from "solid-js"
+import { createResource, createEffect, createMemo, For, Show, Suspense, createSignal, onCleanup } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
@@ -9,6 +9,8 @@ import { base64Encode } from "@opencode-ai/util/encode"
 import { Icon } from "@opencode-ai/ui/icon"
 import { showToast } from "@opencode-ai/ui/toast"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { TextField } from "@opencode-ai/ui/text-field"
+import { Checkbox } from "@opencode-ai/ui/checkbox"
 
 export default function SkillsPage() {
     const params = useParams()
@@ -17,14 +19,26 @@ export default function SkillsPage() {
     const navigate = useNavigate()
     const currentDir = () => decode64(params.dir)
 
+    /** pull / push / clone 共用：从工作区路径解析 Git/技能同步账号 */
+    const accountFromWorkspaceDir = (dir: string): string | null => {
+        if (dir.startsWith("/home/")) return dir.split("/")[2] || null
+        if (dir.startsWith("/Users/leoliu/myroom/")) return "xiaogenliu"
+        return null
+    }
+
     const [uploadModalOpen, setUploadModalOpen] = createSignal(false)
     const [selectedSkill, setSelectedSkill] = createSignal<any>(null)
     const [uploadCatalog, setUploadCatalog] = createSignal("AIK")
     const [isUploading, setIsUploading] = createSignal(false)
 
-    // Git Clone States
-    const [gitModalOpen, setGitModalOpen] = createSignal(false)
-    const [gitUrl, setGitUrl] = createSignal("")
+    type SkillMarketRepo = { id: string; name: string; description: string; web_url: string }
+
+    const [skillMarketOpen, setSkillMarketOpen] = createSignal(false)
+    const [marketRepos, setMarketRepos] = createSignal<SkillMarketRepo[]>([])
+    const [marketLoading, setMarketLoading] = createSignal(false)
+    const [marketErr, setMarketErr] = createSignal<string | null>(null)
+    const [marketFilter, setMarketFilter] = createSignal("")
+    const [marketSelectedIds, setMarketSelectedIds] = createSignal<string[]>([])
     const [isCloning, setIsCloning] = createSignal(false)
 
     // Pull/Refresh Skill State
@@ -77,27 +91,45 @@ export default function SkillsPage() {
 
         if (!confirm(language.t("skills.delete.confirm", { name: skill.name }))) return
 
-        const skillDir = skill.location.split("/").slice(0, -1).join("/")
+        const skillDirAbs = skill.location.split("/").slice(0, -1).join("/")
+        const root = dir.replace(/\/+$/, "")
+        const parent = skillDirAbs.replace(/\/+$/, "")
+        const rel = parent.startsWith(root + "/") ? parent.slice(root.length + 1) : undefined
+
+        if (parent === root) {
+            showToast({
+                title: language.t("skills.delete.failed.title"),
+                description: language.t("skills.delete.invalidPath"),
+                variant: "error",
+            })
+            return
+        }
+
+        if (rel === undefined) {
+            showToast({
+                title: language.t("skills.delete.failed.title"),
+                description: language.t("skills.delete.outsideWorkspace"),
+                variant: "error",
+            })
+            return
+        }
 
         try {
-            await globalSDK.client.pty.create({
+            await globalSDK.client.file.delete({
                 directory: dir,
-                command: "rm",
-                args: ["-rf", skillDir],
-                cwd: dir,
+                path: rel,
             })
-            // 清空后端 Skill.state() 缓存，让下次 GET /skill 重新扫描磁盘
             await globalSDK.client.instance.dispose({ directory: dir }).catch(() => undefined)
             showToast({
                 title: language.t("skills.delete.success.title"),
-                description: language.t("skills.delete.success.description", { name: skill.name })
+                description: language.t("skills.delete.success.description", { name: skill.name }),
             })
             refetchLocal()
         } catch (err: any) {
             showToast({
                 title: language.t("skills.delete.failed.title"),
                 description: err?.message,
-                variant: "error"
+                variant: "error",
             })
         }
     }
@@ -143,12 +175,7 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        let account = ""
-        if (dir.startsWith("/home/")) {
-            account = dir.split("/")[2]
-        } else if (dir.startsWith("/Users/leoliu/myroom/")) {
-            account = dir.split("/")[4]
-        }
+        const account = accountFromWorkspaceDir(dir) ?? ""
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
@@ -158,7 +185,7 @@ export default function SkillsPage() {
         setPublishModalOpen(false)
         setIsPublishingSkill(skill.name)
         try {
-            const res = await fetch(`${globalSDK.url}/skill/publish?directory=${encodeURIComponent(dir)}`, {
+            const res = await fetch(`${globalSDK.url}/skill/push?directory=${encodeURIComponent(dir)}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ directory: dir, name: account, skillPath, commitMessage: msg }),
@@ -272,12 +299,7 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        let account = ""
-        if (dir.startsWith("/home/")) {
-            account = dir.split("/")[2]
-        } else if (dir.startsWith("/Users/leoliu/myroom/myskill-creator")) {
-            account = 'xiaogenliu'
-        }
+        const account = accountFromWorkspaceDir(dir) ?? ""
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
@@ -307,40 +329,109 @@ export default function SkillsPage() {
         }
     }
 
-    const handleGitClone = async () => {
-        const dir = currentDir()
-        const url = gitUrl().trim()
-        if (!dir || !url) return
+    const marketFiltered = createMemo(() => {
+        const q = marketFilter().trim().toLowerCase()
+        const rows = marketRepos()
+        if (!q) return rows
+        return rows.filter((r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q))
+    })
 
-        let account = ""
-        if (dir.startsWith("/home/")) {
-            account = dir.split("/")[2]
-        } else if (dir.startsWith("/Users/leoliu/myroom/")) {
-            account = dir.split("/")[4]
+    const openSkillMarket = async () => {
+        const dir = currentDir()
+        if (!dir) return
+        setSkillMarketOpen(true)
+        setMarketLoading(true)
+        setMarketErr(null)
+        setMarketRepos([])
+        setMarketSelectedIds([])
+        setMarketFilter("")
+        try {
+            const res = await fetch(`${globalSDK.url}/skill/repos?directory=${encodeURIComponent(dir)}`)
+            const data: unknown = await res.json().catch(() => null)
+            if (!res.ok) {
+                const msg =
+                    data &&
+                    typeof data === "object" &&
+                    "message" in data &&
+                    typeof (data as { message: unknown }).message === "string"
+                        ? (data as { message: string }).message
+                        : res.statusText
+                setMarketErr(msg)
+                return
+            }
+            if (!Array.isArray(data)) {
+                setMarketErr("Invalid response")
+                return
+            }
+            setMarketRepos(data as SkillMarketRepo[])
+        } catch (e: any) {
+            setMarketErr(e?.message ?? "Network error")
+        } finally {
+            setMarketLoading(false)
         }
+    }
+
+    const cloneSkillRepoRequest = async (dir: string, account: string, gitUrl: string) => {
+        const res = await fetch(`${globalSDK.url}/skill/clone?directory=${encodeURIComponent(dir)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ directory: dir, name: account, gitUrl: gitUrl.trim() }),
+        })
+        if (!res.ok) {
+            const text = await res.text().catch(() => res.statusText)
+            throw new Error(text)
+        }
+    }
+
+    const toggleMarketSelection = (id: string) => {
+        const cur = marketSelectedIds()
+        if (cur.includes(id)) setMarketSelectedIds(cur.filter((x) => x !== id))
+        else setMarketSelectedIds([...cur, id])
+    }
+
+    const handleMarketConfirm = async () => {
+        const ids = marketSelectedIds()
+        if (ids.length === 0) return
+        const dir = currentDir()
+        if (!dir) return
+        const account = accountFromWorkspaceDir(dir)
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
         }
+        const rows = ids
+            .map((id) => marketRepos().find((r) => r.id === id))
+            .filter((r): r is SkillMarketRepo => !!r)
+        if (rows.length === 0) return
 
         setIsCloning(true)
         try {
-            const res = await fetch(`${globalSDK.url}/skill/clone?directory=${encodeURIComponent(dir)}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ directory: dir, name: account, gitUrl: url }),
-            })
-            if (!res.ok) {
-                const text = await res.text().catch(() => res.statusText)
-                throw new Error(text)
+            for (const row of rows) {
+                try {
+                    await cloneSkillRepoRequest(dir, account, row.web_url)
+                } catch (e: any) {
+                    console.error(e)
+                    showToast({
+                        title: language.t("skills.gitClone.failed.title"),
+                        description: language.t("skills.market.cloneFailedAt", {
+                            name: row.name,
+                            message: e?.message ?? String(e),
+                        }),
+                        variant: "error",
+                    })
+                    return
+                }
             }
-            setGitModalOpen(false)
-            setGitUrl("")
+            setSkillMarketOpen(false)
+            setMarketSelectedIds([])
             await handleRefresh()
-            showToast({ title: language.t("skills.gitClone.success.title"), description: language.t("skills.gitClone.success.description") })
-        } catch (e: any) {
-            console.error(e)
-            showToast({ title: language.t("skills.gitClone.failed.title"), description: e.message, variant: "error" })
+            showToast({
+                title: language.t("skills.gitClone.success.title"),
+                description:
+                    rows.length === 1
+                        ? language.t("skills.gitClone.success.description")
+                        : language.t("skills.market.cloneSuccess", { count: String(rows.length) }),
+            })
         } finally {
             setIsCloning(false)
         }
@@ -359,7 +450,7 @@ export default function SkillsPage() {
                             {language.t("skills.refresh")}
                         </div>
                     </Button>
-                    <Button variant="secondary" onClick={() => setGitModalOpen(true)}>
+                    <Button variant="secondary" onClick={openSkillMarket}>
                         {language.t("skills.gitClone.button")}
                     </Button>
                     <Button variant="primary" onClick={() => setKbModalOpen(true)}>
@@ -598,36 +689,107 @@ export default function SkillsPage() {
                 </div>
             </Show>
 
-            {/* Git Clone Modal */}
-            <Show when={gitModalOpen()}>
-                <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm shadow-xl" onClick={() => setGitModalOpen(false)}>
-                    <div class="w-full max-w-md bg-background-base rounded-xl border border-border-weak-base shadow-md p-6" onClick={(e) => e.stopPropagation()}>
-                        <div class="flex items-center gap-3 mb-6 border-b border-border-weak-base pb-4">
+            {/* Skill marketplace */}
+            <Show when={skillMarketOpen()}>
+                <div
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden bg-black/50 backdrop-blur-sm shadow-xl"
+                    onClick={() => !isCloning() && setSkillMarketOpen(false)}
+                >
+                    <div
+                        class="w-full max-w-lg max-h-[min(560px,85vh)] flex flex-col overflow-hidden bg-background-base rounded-xl border border-border-weak-base shadow-md p-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div class="flex items-center gap-3 mb-4 border-b border-border-weak-base pb-4 shrink-0">
                             <div class="flex items-center justify-center size-10 rounded-full bg-element-base text-icon-base shadow-sm">
                                 <Icon name="download" class="size-5" />
                             </div>
-                            <div>
-                                <h2 class="text-16-medium text-text-strong">{language.t("skills.gitClone.modal.title")}</h2>
-                                <p class="text-13-regular text-text-weak mt-1">{language.t("skills.gitClone.modal.description")}</p>
+                            <div class="min-w-0">
+                                <h2 class="text-16-medium text-text-strong">{language.t("skills.market.title")}</h2>
+                                <p class="text-13-regular text-text-weak mt-1">{language.t("skills.market.description")}</p>
                             </div>
                         </div>
 
-                        <div class="mb-6">
-                            <label class="block text-14-medium text-text-strong mb-2">{language.t("skills.gitClone.modal.urlLabel")}</label>
-                            <input
-                                type="text"
-                                class="w-full h-10 px-3 bg-surface-base border border-border-weak-base rounded-md text-14-regular text-text-strong focus:border-element-active focus:outline-none"
-                                placeholder={language.t("skills.gitClone.modal.placeholder")}
-                                value={gitUrl()}
-                                onInput={(e) => setGitUrl(e.target.value)}
-                            />
+                        <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+                            <div class="flex shrink-0 items-center gap-2 rounded-md border border-border-weak-base bg-surface-base px-3 min-h-10 focus-within:border-border-weak-base">
+                                <Icon name="magnifying-glass" class="size-4 shrink-0 text-icon-weak-base" aria-hidden />
+                                <TextField
+                                    hideLabel
+                                    label={language.t("skills.market.search.placeholder")}
+                                    placeholder={language.t("skills.market.search.placeholder")}
+                                    value={marketFilter()}
+                                    onChange={setMarketFilter}
+                                    disabled={marketLoading() || !!marketErr() || isCloning()}
+                                    variant="ghost"
+                                    type="text"
+                                    spellcheck={false}
+                                    autocorrect="off"
+                                    autocomplete="off"
+                                    autocapitalize="off"
+                                    class="min-h-8 h-8 min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none ring-0 outline-none focus:ring-0 focus-visible:ring-0"
+                                />
+                            </div>
+
+                            <Show when={marketLoading()}>
+                                <div class="text-13-regular text-text-weak py-8 text-center shrink-0">{language.t("skills.market.loading")}</div>
+                            </Show>
+
+                            <Show when={!marketLoading() && marketErr()}>
+                                <div class="text-13-regular text-negative-base py-4 shrink-0 overflow-y-auto">{marketErr()}</div>
+                            </Show>
+
+                            <Show when={!marketLoading() && !marketErr() && marketRepos().length === 0}>
+                                <div class="text-13-regular text-text-weak py-8 text-center shrink-0">{language.t("skills.market.listEmpty")}</div>
+                            </Show>
+
+                            <Show when={!marketLoading() && !marketErr() && marketRepos().length > 0}>
+                                <div class="flex min-h-0 flex-1 flex-col overflow-hidden border border-border-weak-base rounded-md bg-surface-base">
+                                    <div class="flex flex-col gap-1 min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-2">
+                                    <Show
+                                        when={marketFiltered().length > 0}
+                                        fallback={
+                                            <div class="text-13-regular text-text-weak py-6 text-center px-2">
+                                                {language.t("skills.market.empty")}
+                                            </div>
+                                        }
+                                    >
+                                        <For each={marketFiltered()}>
+                                            {(r) => (
+                                                <button
+                                                    type="button"
+                                                    class="flex gap-3 w-full text-left px-2 py-2 rounded-md border border-transparent hover:bg-surface-raised-base transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                                    classList={{
+                                                        "border-element-active bg-surface-raised-base": marketSelectedIds().includes(r.id),
+                                                    }}
+                                                    disabled={isCloning()}
+                                                    onClick={() => toggleMarketSelection(r.id)}
+                                                >
+                                                    <Checkbox readOnly checked={marketSelectedIds().includes(r.id)} class="shrink-0 mt-0.5" />
+                                                    <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+                                                        <span class="text-13-medium text-text-strong">{r.name}</span>
+                                                        <Tooltip value={r.description} disabled={!r.description}>
+                                                            <span class="text-12-regular text-text-weak truncate block w-full text-left">
+                                                                {r.description}
+                                                            </span>
+                                                        </Tooltip>
+                                                    </div>
+                                                </button>
+                                            )}
+                                        </For>
+                                    </Show>
+                                    </div>
+                                </div>
+                            </Show>
                         </div>
 
-                        <div class="flex justify-end gap-3 pt-4 border-t border-border-weak-base">
-                            <Button variant="ghost" onClick={() => setGitModalOpen(false)} disabled={isCloning()}>
+                        <div class="flex justify-end gap-3 pt-4 border-t border-border-weak-base mt-4 shrink-0">
+                            <Button variant="ghost" onClick={() => setSkillMarketOpen(false)} disabled={isCloning()}>
                                 {language.t("common.cancel")}
                             </Button>
-                            <Button variant="primary" onClick={handleGitClone} disabled={isCloning() || !gitUrl().trim()}>
+                            <Button
+                                variant="primary"
+                                onClick={handleMarketConfirm}
+                                disabled={isCloning() || marketSelectedIds().length === 0 || marketLoading() || !!marketErr()}
+                            >
                                 {isCloning() ? language.t("skills.gitClone.cloning") : language.t("skills.gitClone.confirm")}
                             </Button>
                         </div>

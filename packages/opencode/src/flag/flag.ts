@@ -42,6 +42,19 @@ export namespace Flag {
   export const OPENCODE_ACCESS_GRANTS = process.env["OPENCODE_ACCESS_GRANTS"]
   export const TPP_APPSECRET = process.env["TPP_APPSECRET"] ?? "c1ad326beeb0dee83b127e77a07b3d9d"
   export const OPENCODE_ENABLE_QUESTION_TOOL = truthy("OPENCODE_ENABLE_QUESTION_TOOL")
+  /** GET /skill/repos — marketplace list API (CNB). */
+  export const OPENCODE_SKILL_MARKET_REPOS_URL =
+    process.env["OPENCODE_SKILL_MARKET_REPOS_URL"] ?? "https://api.cnb.tmeoa.com/kudata-skills/-/repos"
+  /** Verbatim Authorization header value for the marketplace API. */
+  export const OPENCODE_SKILL_MARKET_TOKEN = process.env["OPENCODE_SKILL_MARKET_TOKEN"]
+  /** Page size when calling marketplace repos API (1–500, default 20). */
+  export const OPENCODE_SKILL_MARKET_PAGE_SIZE = (() => {
+    const raw = process.env["OPENCODE_SKILL_MARKET_PAGE_SIZE"]
+    if (!raw) return 20
+    const n = Number(raw)
+    if (!Number.isInteger(n) || n < 1) return 20
+    return Math.min(n, 500)
+  })()
 
   // Experimental
   export const OPENCODE_EXPERIMENTAL = truthy("OPENCODE_EXPERIMENTAL")

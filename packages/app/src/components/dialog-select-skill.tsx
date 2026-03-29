@@ -1,4 +1,7 @@
 import { Popover as Kobalte } from "@kobalte/core/popover"
+import { useNavigate } from "@solidjs/router"
+import { base64Encode } from "@opencode-ai/util/encode"
+import { IconButton } from "@opencode-ai/ui/icon-button"
 import { createMemo, createResource, type ComponentProps, type JSX, type ValidComponent } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "@/context/sdk"
@@ -17,13 +20,18 @@ const SkillList = (props: {
   skills: () => Skill[]
   class?: string
   onSelect: (skill: Skill | undefined) => void
+  searchAction?: JSX.Element
 }) => {
   const language = useLanguage()
 
   return (
     <List
       class={`flex-1 min-h-0 [&_[data-slot=list-scroll]]:flex-1 [&_[data-slot=list-scroll]]:min-h-0 ${props.class ?? ""}`}
-      search={{ placeholder: language.t("dialog.skill.search.placeholder"), autofocus: true }}
+      search={{
+        placeholder: language.t("dialog.skill.search.placeholder"),
+        autofocus: true,
+        ...(props.searchAction ? { action: props.searchAction } : {}),
+      }}
       emptyMessage={language.t("dialog.skill.empty")}
       key={(x) => x?.name ?? ""}
       items={props.skills}
@@ -66,6 +74,14 @@ export function SkillSelectorPopover(props: {
   const sdk = useSDK()
   const globalSDK = useGlobalSDK()
   const language = useLanguage()
+  const navigate = useNavigate()
+
+  const goSkills = () => {
+    const dir = sdk.directory
+    if (!dir) return
+    setStore("open", false)
+    navigate(`/${base64Encode(dir)}/skills`)
+  }
 
   const [skillsRes] = createResource(
     () => sdk.directory,
@@ -123,6 +139,20 @@ export function SkillSelectorPopover(props: {
           <SkillList
             skills={skills}
             class="p-1"
+            searchAction={
+              sdk.directory ? (
+                <Tooltip placement="top" value={language.t("dialog.skill.manage")}>
+                  <IconButton
+                    icon="knowledge-base"
+                    variant="ghost"
+                    iconSize="normal"
+                    class="size-6"
+                    aria-label={language.t("dialog.skill.manage")}
+                    onClick={goSkills}
+                  />
+                </Tooltip>
+              ) : undefined
+            }
             onSelect={(skill) => {
               props.onSelect?.(skill)
               setStore("open", false)
