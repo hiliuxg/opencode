@@ -45,7 +45,7 @@ export namespace Flag {
   /** GET /skill/repos — marketplace list API (CNB). */
   export const OPENCODE_SKILL_MARKET_REPOS_URL =
     process.env["OPENCODE_SKILL_MARKET_REPOS_URL"] ?? "https://api.cnb.tmeoa.com/kudata-skills/-/repos"
-  /** Verbatim Authorization header value for the marketplace API. */
+  /** Marketplace API Authorization header; also used as HTTPS password for `POST /skill/push` git operations. */
   export const OPENCODE_SKILL_MARKET_TOKEN = process.env["OPENCODE_SKILL_MARKET_TOKEN"]
   /** Page size when calling marketplace repos API (1–500, default 20). */
   export const OPENCODE_SKILL_MARKET_PAGE_SIZE = (() => {

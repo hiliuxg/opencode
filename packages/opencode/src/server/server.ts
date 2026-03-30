@@ -762,7 +762,8 @@ export namespace Server {
           "/skill/push",
           describeRoute({
             summary: "Push skill to git remote",
-            description: "Check git status and push local skill changes to the remote repository on a new branch.",
+            description:
+              "Check git status and push local skill changes to the remote repository on a new branch. Requires OPENCODE_SKILL_MARKET_TOKEN for HTTPS authentication to origin.",
             operationId: "skill.push",
             responses: {
               200: {
@@ -815,9 +816,16 @@ export namespace Server {
             const safeRemote = remoteUrl.replace(/:\/\/([^:@/]+):([^@/]+)@/, "://$1:***@")
             log.info("[skill/push] remote url", { remoteUrl: safeRemote })
 
+            const marketToken = Flag.OPENCODE_SKILL_MARKET_TOKEN?.trim()
+            if (!marketToken) {
+              throw new NamedError.Unknown({
+                message: "Skill marketplace token not configured (OPENCODE_SKILL_MARKET_TOKEN)",
+              })
+            }
+
             const parsed = new URL(remoteUrl)
             parsed.username = name
-            parsed.password = "4LXfT11bcFQaU5T27Zgw40G7jYB"
+            parsed.password = marketToken
             const authedUrl = parsed.toString()
             log.info("[skill/push] built auth url", { host: parsed.host, pathname: parsed.pathname, username: parsed.username })
 
