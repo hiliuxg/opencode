@@ -3463,7 +3463,7 @@ export class Skill extends HeyApiClient {
   /**
    * Push skill to git remote
    *
-   * Check git status and push local skill changes to the remote repository on a new branch.
+   * Check git status and push local skill changes to the remote repository on a new branch. Requires OPENCODE_SKILL_MARKET_TOKEN for HTTPS authentication to origin.
    */
   public push<ThrowOnError extends boolean = false>(
     parameters?: {
