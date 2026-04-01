@@ -22,13 +22,11 @@ import { useComments } from "@/context/comments"
 import { SessionHeader, NewSessionView } from "@/components/session"
 import { same } from "@/utils/same"
 import { createOpenReviewFile } from "@/pages/session/helpers"
-import { createScrollSpy } from "@/pages/session/scroll-spy"
 import { SessionReviewTab, type DiffStyle, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { MessageTimeline } from "@/pages/session/message-timeline"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { SessionComposerRegion, createSessionComposerState } from "@/pages/session/composer"
-import { SessionMobileTabs } from "@/pages/session/session-mobile-tabs"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { setCursorPosition } from "@/components/prompt-input/editor-dom"
@@ -213,7 +211,6 @@ export default function Page() {
   const [store, setStore] = createStore({
     messageId: undefined as string | undefined,
     turnStart: 0,
-    mobileTab: "session" as "session" | "changes",
     changes: "session" as "session" | "turn",
     newSessionWorktree: "main",
   })
@@ -416,7 +413,7 @@ export default function Page() {
       .filter((tab) => tab !== "context" && tab !== "review"),
   )
 
-  const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
+  const mobileChanges = createMemo(() => false)
   const reviewTab = createMemo(() => isDesktop() && !layout.fileTree.opened())
 
   const fileTreeTab = () => layout.fileTree.tab()
@@ -734,7 +731,7 @@ export default function Page() {
 
     const wants = isDesktop()
       ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
-      : store.mobileTab === "changes"
+      : false
     if (!wants) return
     if (sync.data.session_diff[id] !== undefined) return
     if (sync.status === "loading") return
@@ -778,13 +775,6 @@ export default function Page() {
 
   let scrollStateFrame: number | undefined
   let scrollStateTarget: HTMLDivElement | undefined
-  const scrollSpy = createScrollSpy({
-    onActive: (id) => {
-      if (id === store.messageId) return
-      setStore("messageId", id)
-    },
-  })
-
   const updateScrollState = (el: HTMLDivElement) => {
     const max = el.scrollHeight - el.clientHeight
     const overflow = max > 1
@@ -831,22 +821,11 @@ export default function Page() {
     ),
   )
 
-  createEffect(
-    on(
-      sessionKey,
-      () => {
-        scrollSpy.clear()
-      },
-      { defer: true },
-    ),
-  )
-
   const anchor = (id: string) => `message-${id}`
 
   const setScrollRef = (el: HTMLDivElement | undefined) => {
     scroller = el
     autoScroll.scrollRef(el)
-    scrollSpy.setContainer(el)
     if (el) scheduleScrollState(el)
   }
 
@@ -855,7 +834,6 @@ export default function Page() {
     () => {
       const el = scroller
       if (el) scheduleScrollState(el)
-      scrollSpy.markDirty()
     },
   )
 
@@ -958,7 +936,6 @@ export default function Page() {
       if (stick) autoScroll.forceScrollToBottom()
 
       if (el) scheduleScrollState(el)
-      scrollSpy.markDirty()
     },
   )
 
@@ -1031,7 +1008,6 @@ export default function Page() {
   onCleanup(() => {
     cancelTurnBackfill()
     document.removeEventListener("keydown", handleKeyDown)
-    scrollSpy.destroy()
     if (scrollStateFrame !== undefined) cancelAnimationFrame(scrollStateFrame)
   })
 
@@ -1039,15 +1015,6 @@ export default function Page() {
     <div class="relative bg-background-base size-full overflow-hidden flex flex-col">
       <SessionHeader />
       <div class="flex-1 min-h-0 flex flex-col md:flex-row">
-        <SessionMobileTabs
-          open={!isDesktop() && !!params.id}
-          mobileTab={store.mobileTab}
-          hasReview={hasReview()}
-          reviewCount={reviewCount()}
-          onSession={() => setStore("mobileTab", "session")}
-          onChanges={() => setStore("mobileTab", "changes")}
-        />
-
         {/* Session panel */}
         <div
           classList={{
@@ -1083,7 +1050,6 @@ export default function Page() {
                     onMarkScrollGesture={markScrollGesture}
                     hasScrollGesture={hasScrollGesture}
                     isDesktop={isDesktop()}
-                    onScrollSpyScroll={scrollSpy.onScroll}
                     onAutoScrollInteraction={autoScroll.handleInteraction}
                     centered={centered()}
                     setContentRef={(el) => {
@@ -1105,9 +1071,6 @@ export default function Page() {
                     }}
                     renderedUserMessages={renderedUserMessages()}
                     anchor={anchor}
-                    onRegisterMessage={scrollSpy.register}
-                    onUnregisterMessage={scrollSpy.unregister}
-                    lastUserMessageID={lastUserMessage()?.id}
                   />
                 </Show>
               </Match>

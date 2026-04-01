@@ -16,7 +16,7 @@ import { TuiRoutes } from "./routes/tui"
 import { Instance } from "../project/instance"
 import { Vcs } from "../project/vcs"
 import { Agent } from "../agent/agent"
-import { Skill } from "../skill/skill"
+import { Skill } from "../skill"
 import { Auth } from "../auth"
 import { Flag } from "../flag/flag"
 import { Command } from "../command"
@@ -42,6 +42,7 @@ import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
 import { createHash, createDecipheriv } from "node:crypto"
 import { base64Decode, base64Encode } from "@opencode-ai/util/encode"
+import "./projectors"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -273,7 +274,7 @@ export namespace Server {
               providerID: z.string(),
             }),
           ),
-          validator("json", Auth.Info),
+          validator("json", Auth.Info.zod),
           async (c) => {
             const providerID = c.req.valid("param").providerID
             const info = c.req.valid("json")

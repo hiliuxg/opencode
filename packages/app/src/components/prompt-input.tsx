@@ -37,7 +37,8 @@ import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
-import { createPromptAttachments, ACCEPTED_FILE_TYPES } from "./prompt-input/attachments"
+import { createPromptAttachments } from "./prompt-input/attachments"
+import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
 import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
@@ -882,6 +883,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     info,
     imageAttachments,
     commentCount,
+    autoAccept: () => permission.isAutoAcceptingDirectory(sdk.directory),
     mode: () => store.mode,
     working,
     editor: () => editorRef,

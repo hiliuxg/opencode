@@ -109,7 +109,6 @@ export const dict: Record<string, string> = {
   "ui.tool.todos.read": "Read to-dos",
   "ui.tool.questions": "Questions",
   "ui.tool.agent": "{{type}} Agent",
-<<<<<<< HEAD
   "ui.tool.mcp.run_query": "Run SQL Query",
   "ui.tool.mcp.input": "Input Parameters",
   "ui.tool.mcp.output": "Output Parameters",

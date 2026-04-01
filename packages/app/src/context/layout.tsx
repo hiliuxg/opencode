@@ -165,8 +165,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const width = typeof fileTree.width === "number" ? fileTree.width : DEFAULT_FILE_TREE_WIDTH
         return {
           ...fileTree,
-          opened: false,
-          width: width === 260 ? DEFAULT_PANEL_WIDTH : width,
+          opened: true,
+          width: width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
           tab: "changes",
         }
       })()
@@ -175,7 +175,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         if (!isRecord(review)) return review
         if (typeof review.panelOpened === "boolean") return review
 
-        const opened = isRecord(fileTree) && typeof fileTree.opened === "boolean" ? fileTree.opened : false
+        const opened = isRecord(fileTree) && typeof fileTree.opened === "boolean" ? fileTree.opened : true
         return {
           ...review,
           panelOpened: opened,
@@ -230,8 +230,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       { ...target, migrate },
       createStore({
         sidebar: {
-          opened: true,
-          width: DEFAULT_PANEL_WIDTH,
+          opened: false,
+          width: DEFAULT_SIDEBAR_WIDTH,
           workspaces: {} as Record<string, boolean>,
           workspacesDefault: false,
         },
@@ -241,11 +241,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
         review: {
           diffStyle: "split" as ReviewDiffStyle,
-          panelOpened: false,
+          panelOpened: true,
         },
         fileTree: {
           opened: false,
-          width: DEFAULT_PANEL_WIDTH,
+          width: DEFAULT_FILE_TREE_WIDTH,
           tab: "changes" as "changes" | "all",
         },
         session: {
@@ -635,19 +635,19 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         diffStyle: createMemo(() => store.review?.diffStyle ?? "split"),
         setDiffStyle(diffStyle: ReviewDiffStyle) {
           if (!store.review) {
-            setStore("review", { diffStyle, panelOpened: false })
+            setStore("review", { diffStyle, panelOpened: true })
             return
           }
           setStore("review", "diffStyle", diffStyle)
         },
       },
       fileTree: {
-        opened: createMemo(() => store.fileTree?.opened ?? false),
-        width: createMemo(() => store.fileTree?.width ?? DEFAULT_PANEL_WIDTH),
+        opened: createMemo(() => store.fileTree?.opened ?? true),
+        width: createMemo(() => store.fileTree?.width ?? DEFAULT_FILE_TREE_WIDTH),
         tab: createMemo(() => store.fileTree?.tab ?? "changes"),
         setTab(tab: "changes" | "all") {
           if (!store.fileTree) {
-            setStore("fileTree", { opened: false, width: DEFAULT_PANEL_WIDTH, tab })
+            setStore("fileTree", { opened: true, width: DEFAULT_FILE_TREE_WIDTH, tab })
             return
           }
           setStore("fileTree", "tab", tab)
@@ -675,7 +675,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
         resize(width: number) {
           if (!store.fileTree) {
-            setStore("fileTree", { opened: false, width, tab: "changes" })
+            setStore("fileTree", { opened: true, width, tab: "changes" })
             return
           }
           setStore("fileTree", "width", width)
@@ -750,7 +750,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const key = createSessionKeyReader(sessionKey, ensureKey)
         const s = createMemo(() => store.sessionView[key()] ?? { scroll: {} })
         const terminalOpened = createMemo(() => store.terminal?.opened ?? false)
-        const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? false)
+        const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? true)
 
         function setTerminalOpened(next: boolean) {
           const current = store.terminal
@@ -771,7 +771,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             return
           }
 
-          const value = current.panelOpened ?? false
+          const value = current.panelOpened ?? true
           if (value === next) return
           setStore("review", "panelOpened", next)
         }

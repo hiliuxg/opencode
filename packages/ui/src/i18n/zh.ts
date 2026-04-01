@@ -115,7 +115,7 @@ export const dict = {
   "ui.tool.mcp.get_table_columns": "获取表字段信息",
   "ui.tool.mcp.render_chart": "渲染图表",
   "ui.tool.agent.default": "智能体",
-  "ui.tool.skill": "加载技能",
+  "ui.tool.skill": "技能",
 
   "ui.common.file.one": "个文件",
   "ui.common.file.other": "个文件",
@@ -164,7 +164,6 @@ export const dict = {
   "ui.fileSearch.nextMatch": "下一个",
   "ui.fileSearch.close": "关闭搜索",
   "ui.tool.task": "任务",
-  "ui.tool.skill": "技能",
   "ui.basicTool.called": "调用了 `{{tool}}`",
   "ui.toolErrorCard.failed": "失败",
   "ui.toolErrorCard.copyError": "复制错误",

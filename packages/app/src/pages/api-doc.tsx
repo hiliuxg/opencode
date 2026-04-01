@@ -1,5 +1,5 @@
 import { createMemo, createSignal, createResource, For, Show, type JSX } from "solid-js"
-import { Code } from "@opencode-ai/ui/code"
+import { File } from "@opencode-ai/ui/file"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -27,7 +27,7 @@ function CodeBlock(props: { code: string; name: string }) {
 
     return (
         <div class="relative group border border-border-base rounded-md overflow-hidden my-2">
-            <Code file={file()} overflow="wrap" class="select-text bg-background-base" />
+            <File mode="text" file={file()} overflow="wrap" class="select-text bg-background-base" />
             <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Tooltip placement="left" value={copied() ? "Copied!" : "Copy"}>
                     <IconButton

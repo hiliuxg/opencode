@@ -29,8 +29,8 @@ export function SessionSidePanel(props: {
   reviewPanel: () => JSX.Element
   activeDiff?: string
   focusReviewDiff: (path: string) => void
-  reviewSnap: boolean
-  size: Sizing
+  reviewSnap?: boolean
+  size?: Sizing
 }) {
   const layout = useLayout()
   const sync = useSync()
@@ -143,6 +143,7 @@ export function SessionSidePanel(props: {
   const activeFileTab = tabState.activeFileTab
 
   const fileTreeTab = () => layout.fileTree.tab()
+  const moving = () => props.size?.active() ?? false
 
   const setFileTreeTabValue = (value: string) => {
     if (value !== "changes" && value !== "all") return
@@ -210,7 +211,7 @@ export function SessionSidePanel(props: {
         classList={{
           "pointer-events-none": !open(),
           "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-            !props.size.active() && !props.reviewSnap,
+            !moving() && !props.reviewSnap,
         }}
         style={{ width: panelWidth() }}
       >
@@ -361,7 +362,7 @@ export function SessionSidePanel(props: {
             classList={{
               "pointer-events-none": !fileOpen(),
               "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-                !props.size.active(),
+                !moving(),
             }}
             style={{ width: treeWidth() }}
           >
@@ -432,7 +433,7 @@ export function SessionSidePanel(props: {
               </Tabs>
             </div>
             <Show when={fileOpen()}>
-              <div onPointerDown={() => props.size.start()}>
+              <div onPointerDown={() => props.size?.start()}>
                 <ResizeHandle
                   direction="horizontal"
                   edge="start"
@@ -440,7 +441,7 @@ export function SessionSidePanel(props: {
                   min={200}
                   max={480}
                   onResize={(width) => {
-                    props.size.touch()
+                    props.size?.touch()
                     layout.fileTree.resize(width)
                   }}
                 />
