@@ -12,7 +12,7 @@ import { base64Encode } from "@opencode-ai/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
-import { playSound, soundSrc } from "@/utils/sound"
+import { playSoundById } from "@/utils/sound"
 
 type NotificationBase = {
   directory?: string
@@ -235,7 +235,7 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
 
         /*
         if (settings.sounds.agentEnabled()) {
-          playSound(soundSrc(settings.sounds.agent()))
+          void playSoundById(settings.sounds.agent())
         }
         */
 
@@ -268,7 +268,7 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
 
         /*
         if (settings.sounds.errorsEnabled()) {
-          playSound(soundSrc(settings.sounds.errors()))
+          void playSoundById(settings.sounds.errors())
         }
         */
 

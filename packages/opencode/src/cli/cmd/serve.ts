@@ -2,6 +2,9 @@ import { Server } from "../../server/server"
 import { cmd } from "./cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "../../flag/flag"
+import { Workspace } from "../../control-plane/workspace"
+import { Project } from "../../project/project"
+import { Installation } from "../../installation"
 
 export const ServeCommand = cmd({
   command: "serve",
@@ -15,7 +18,8 @@ export const ServeCommand = cmd({
     const server = Server.listen(opts)
     const basePath = Flag.OPENCODE_BASE_PATH ? Flag.OPENCODE_BASE_PATH : ""
     console.log(`opencode server listening on http://${server.hostname}:${server.port}${basePath}`)
-    await new Promise(() => { })
+
+    await new Promise(() => {})
     await server.stop()
   },
 })
