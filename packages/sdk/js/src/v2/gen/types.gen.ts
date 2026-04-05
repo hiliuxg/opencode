@@ -4441,6 +4441,129 @@ export type FileStatusResponses = {
 
 export type FileStatusResponse = FileStatusResponses[keyof FileStatusResponses]
 
+export type FileWriteData = {
+  body?: {
+    path: string
+    content: string
+    encoding?: "base64"
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/write"
+}
+
+export type FileWriteResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type FileWriteResponse = FileWriteResponses[keyof FileWriteResponses]
+
+export type FileMkdirData = {
+  body?: {
+    path: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/mkdir"
+}
+
+export type FileMkdirResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type FileMkdirResponse = FileMkdirResponses[keyof FileMkdirResponses]
+
+export type FileDeleteData = {
+  body?: {
+    path: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/delete"
+}
+
+export type FileDeleteResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type FileDeleteResponse = FileDeleteResponses[keyof FileDeleteResponses]
+
+export type FileRenameData = {
+  body?: {
+    oldPath: string
+    newPath: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/rename"
+}
+
+export type FileRenameResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type FileRenameResponse = FileRenameResponses[keyof FileRenameResponses]
+
+export type FileServeData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    path: string
+  }
+  url: "/file/serve"
+}
+
+export type FileServeResponses = {
+  /**
+   * File content
+   */
+  200: unknown
+}
+
+export type FileDownloadData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    path: string
+  }
+  url: "/file/download"
+}
+
+export type FileDownloadResponses = {
+  /**
+   * File or zip download
+   */
+  200: unknown
+}
+
 export type EventSubscribeData = {
   body?: never
   path?: never

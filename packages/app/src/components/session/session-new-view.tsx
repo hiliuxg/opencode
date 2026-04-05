@@ -1,27 +1,24 @@
-import { Show, createMemo, createResource, For } from "solid-js"
+import { Show, createMemo } from "solid-js"
+import { DateTime } from "luxon"
 import { useSync } from "@/context/sync"
 import { useSDK } from "@/context/sdk"
 import { useLanguage } from "@/context/language"
-import { useGlobalSDK } from "@/context/global-sdk"
+import { Icon } from "@opencode-ai/ui/icon"
+import { Mark } from "@opencode-ai/ui/logo"
 import { getDirectory, getFilename } from "@opencode-ai/util/path"
-import { getGuidedTopics } from "@/utils/admin-api"
 
 const MAIN_WORKTREE = "main"
 const CREATE_WORKTREE = "create"
-const ROOT_CLASS =
-  "size-full flex flex-col justify-end items-start gap-4 flex-[1_0_0] self-stretch max-w-200 mx-auto 2xl:max-w-[1000px] px-6 pb-16"
+const ROOT_CLASS = "size-full flex flex-col"
 
 interface NewSessionViewProps {
   worktree: string
-  onWorktreeChange: (value: string) => void
-  onTopicClick?: (question: string) => void
 }
 
 export function NewSessionView(props: NewSessionViewProps) {
   const sync = useSync()
   const sdk = useSDK()
   const language = useLanguage()
-  const globalSDK = useGlobalSDK()
 
   const sandboxes = createMemo(() => sync.project?.sandboxes ?? [])
   const options = createMemo(() => [MAIN_WORKTREE, ...sandboxes(), CREATE_WORKTREE])
@@ -50,63 +47,45 @@ export function NewSessionView(props: NewSessionViewProps) {
     return getFilename(value)
   }
 
-  // Step 1: Fetch skill list for current directory via SDK
-  const [skillList] = createResource(
-    () => sdk.directory,
-    async (dir) => {
-      if (!dir) return []
-      try {
-        const res = await globalSDK.client.app.skills({ directory: dir })
-        return res.data ?? []
-      } catch {
-        return []
-      }
-    },
-  )
-
-  // Step 2: Pick a random skill, fetch guided topics from admin API
-  const [topics] = createResource(skillList, async (skills) => {
-    if (!skills || skills.length === 0) return []
-    const randomSkill = skills[Math.floor(Math.random() * skills.length)]
-    const skillname = randomSkill?.name
-    if (!skillname) return []
-    try {
-      const res = await getGuidedTopics(skillname, 3)
-      return res
-    } catch {
-      return []
-    }
-  })
-
-  // Click a topic → delegate to parent (which handles prompt + auto-submit)
-  const handleTopicClick = (question: string) => {
-    props.onTopicClick?.(question)
-  }
-
   return (
     <div class={ROOT_CLASS}>
-      {/* Guided Topics — main content */}
-      <Show when={topics() && topics()!.length > 0}>
-        <div class="flex flex-col gap-2 w-full">
-          <div class="text-12-medium text-text-weaker">{language.t("session.new.guidedTopics.label")}</div>
-          <div class="flex flex-row flex-wrap gap-2">
-            <For each={topics()}>
-              {(topic) => (
-                <button
-                  type="button"
-                  class="group text-left inline-flex items-center border border-border-base rounded-xl px-4 py-2 hover:border-border-strong hover:bg-background-hover transition-all cursor-pointer"
-                  onClick={() => handleTopicClick(topic.question)}
-                >
-                  <span class="text-14-regular text-text-base select-text group-hover:text-text-strong transition-colors leading-snug">
-                    {topic.question}
-                  </span>
-                </button>
+      <div class="h-12 shrink-0" aria-hidden />
+      <div class="flex-1 px-6 pb-30 flex items-center justify-center text-center">
+        <div class="w-full max-w-200 flex flex-col items-center text-center gap-4">
+          <div class="flex flex-col items-center gap-6">
+            <Mark class="w-10" />
+            <div class="text-20-medium text-text-strong">{language.t("session.new.title")}</div>
+          </div>
+          <div class="w-full flex flex-col gap-4 items-center">
+            <div class="flex items-start justify-center gap-3 min-h-5">
+              <div class="text-12-medium text-text-weak select-text leading-5 min-w-0 max-w-160 break-words text-center">
+                {getDirectory(projectRoot())}
+                <span class="text-text-strong">{getFilename(projectRoot())}</span>
+              </div>
+            </div>
+            <div class="flex items-start justify-center gap-1.5 min-h-5">
+              <Icon name="branch" size="small" class="mt-0.5 shrink-0" />
+              <div class="text-12-medium text-text-weak select-text leading-5 min-w-0 max-w-160 break-words text-center">
+                {label(current())}
+              </div>
+            </div>
+            <Show when={sync.project}>
+              {(project) => (
+                <div class="flex items-start justify-center gap-3 min-h-5">
+                  <div class="text-12-medium text-text-weak leading-5 min-w-0 max-w-160 break-words text-center">
+                    {language.t("session.new.lastModified")}&nbsp;
+                    <span class="text-text-strong">
+                      {DateTime.fromMillis(project().time.updated ?? project().time.created)
+                        .setLocale(language.intl())
+                        .toRelative()}
+                    </span>
+                  </div>
+                </div>
               )}
-            </For>
+            </Show>
           </div>
         </div>
-      </Show>
-
+      </div>
     </div>
   )
 }

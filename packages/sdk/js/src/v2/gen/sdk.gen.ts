@@ -31,11 +31,17 @@ import type {
   ExperimentalWorkspaceListResponses,
   ExperimentalWorkspaceRemoveErrors,
   ExperimentalWorkspaceRemoveResponses,
+  FileDeleteResponses,
+  FileDownloadResponses,
   FileListResponses,
+  FileMkdirResponses,
   FilePartInput,
   FilePartSource,
   FileReadResponses,
+  FileRenameResponses,
+  FileServeResponses,
   FileStatusResponses,
+  FileWriteResponses,
   FindFilesResponses,
   FindSymbolsResponses,
   FindTextResponses,
@@ -2992,6 +2998,224 @@ export class File extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<FileStatusResponses, unknown, ThrowOnError>({
       url: "/file/status",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Write file
+   *
+   * Write or upload a single file. Use encoding base64 for binary files.
+   */
+  public write<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+      content?: string
+      encoding?: "base64"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+            { in: "body", key: "content" },
+            { in: "body", key: "encoding" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileWriteResponses, unknown, ThrowOnError>({
+      url: "/file/write",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Create directory
+   *
+   * Recursively create a directory.
+   */
+  public mkdir<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileMkdirResponses, unknown, ThrowOnError>({
+      url: "/file/mkdir",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete file or directory
+   *
+   * Delete a file or directory (recursive for directories).
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileDeleteResponses, unknown, ThrowOnError>({
+      url: "/file/delete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Rename or move file
+   *
+   * Rename or move a file or directory.
+   */
+  public rename<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      oldPath?: string
+      newPath?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "oldPath" },
+            { in: "body", key: "newPath" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileRenameResponses, unknown, ThrowOnError>({
+      url: "/file/rename",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Serve file
+   *
+   * Return raw file content with correct Content-Type for inline preview.
+   */
+  public serve<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FileServeResponses, unknown, ThrowOnError>({
+      url: "/file/serve",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Download file or directory
+   *
+   * Download a file directly or a directory as a zip archive.
+   */
+  public download<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FileDownloadResponses, unknown, ThrowOnError>({
+      url: "/file/download",
       ...options,
       ...params,
     })

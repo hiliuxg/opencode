@@ -1,17 +1,20 @@
-import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
+import { ContextMenu } from "@opencode-ai/ui/context-menu"
+import { Icon } from "@opencode-ai/ui/icon"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Mark } from "@opencode-ai/ui/logo"
+import { showToast } from "@opencode-ai/ui/toast"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
-import type { DragEvent } from "@thisbeyond/solid-dnd"
+import type { DragEvent as SolidDndDragEvent } from "@thisbeyond/solid-dnd"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
-import FileTree from "@/components/file-tree"
+import FileTree, { type FileTreeOps } from "@/components/file-tree"
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { SessionContextTab, SortableTab, FileVisual } from "@/components/session"
 import { useCommand } from "@/context/command"
@@ -24,13 +27,36 @@ import { FileTabContent } from "@/pages/session/file-tabs"
 import { createOpenSessionFileTab, createSessionTabs, getTabReorderIndex, type Sizing } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import type { FileNode } from "@opencode-ai/sdk/v2"
+
+function RootInput(props: { placeholder: string; onConfirm: (name: string) => void; onCancel: () => void }) {
+  let ref: HTMLInputElement | undefined
+  createEffect(() => {
+    ref?.focus()
+    ref?.select()
+  })
+  return (
+    <div class="px-1 py-1">
+      <input
+        ref={ref}
+        class="w-full h-6 bg-surface-raised-base border border-border-base rounded-md px-2 text-12-medium text-text-strong outline-none focus:ring-1 focus:ring-border-focus"
+        placeholder={props.placeholder}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") props.onConfirm(e.currentTarget.value.trim())
+          if (e.key === "Escape") props.onCancel()
+        }}
+        onBlur={(e) => props.onConfirm(e.currentTarget.value.trim())}
+      />
+    </div>
+  )
+}
 
 export function SessionSidePanel(props: {
   reviewPanel: () => JSX.Element
   activeDiff?: string
   focusReviewDiff: (path: string) => void
-  reviewSnap?: boolean
-  size?: Sizing
+  reviewSnap: boolean
+  size: Sizing
 }) {
   const layout = useLayout()
   const sync = useSync()
@@ -143,7 +169,6 @@ export function SessionSidePanel(props: {
   const activeFileTab = tabState.activeFileTab
 
   const fileTreeTab = () => layout.fileTree.tab()
-  const moving = () => props.size?.active() ?? false
 
   const setFileTreeTabValue = (value: string) => {
     if (value !== "changes" && value !== "all") return
@@ -165,7 +190,7 @@ export function SessionSidePanel(props: {
     setStore("activeDraggable", id)
   }
 
-  const handleDragOver = (event: DragEvent) => {
+  const handleDragOver = (event: SolidDndDragEvent) => {
     const { draggable, droppable } = event
     if (!draggable || !droppable) return
 
@@ -177,6 +202,186 @@ export function SessionSidePanel(props: {
 
   const handleDragEnd = () => {
     setStore("activeDraggable", undefined)
+  }
+
+  const [uploading, setUploading] = createSignal(false)
+  const [rootCreate, setRootCreate] = createSignal<"file" | "folder" | null>(null)
+
+  const readEntry = (entry: FileSystemEntry, base: string): Promise<{ path: string; content: string; encoding: "base64" }[]> => {
+    return new Promise((ok) => {
+      if (entry.isFile) {
+        ;(entry as FileSystemFileEntry).file((f) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const raw = reader.result as string
+            const content = raw.split(",")[1] || ""
+            ok([{ path: base ? `${base}/${entry.name}` : entry.name, content, encoding: "base64" }])
+          }
+          reader.readAsDataURL(f)
+        })
+        return
+      }
+      if (entry.isDirectory) {
+        const dir = entry as FileSystemDirectoryEntry
+        const dirReader = dir.createReader()
+        dirReader.readEntries(async (entries) => {
+          const all: { path: string; content: string; encoding: "base64" }[] = []
+          for (const child of entries) {
+            const sub = await readEntry(child, base ? `${base}/${entry.name}` : entry.name)
+            all.push(...sub)
+          }
+          ok(all)
+        })
+        return
+      }
+      ok([])
+    })
+  }
+
+  const handleUploadDrop = async (e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const items = e.dataTransfer?.items
+    if (!items) return
+
+    const entries: FileSystemEntry[] = []
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry?.()
+      if (entry) entries.push(entry)
+    }
+    if (entries.length === 0) return
+
+    setUploading(true)
+    const all: { path: string; content: string; encoding: "base64" }[] = []
+    for (const entry of entries) {
+      const sub = await readEntry(entry, "")
+      all.push(...sub)
+    }
+    await file.upload(all).catch((err: unknown) => {
+      showToast({
+        variant: "error",
+        title: language.t("fileTree.upload.error"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    })
+    setUploading(false)
+    showToast({ title: language.t("fileTree.upload.success") })
+  }
+
+  const handleUploadDragOver = (e: DragEvent) => {
+    if (!e.dataTransfer?.types?.includes("Files")) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"
+  }
+
+  const confirmDelete = (node: FileNode) => {
+    const isDir = node.type === "directory"
+    const msg = isDir
+      ? language.t("fileTree.delete.confirmFolder", { name: node.name })
+      : language.t("fileTree.delete.confirmFile", { name: node.name })
+    if (!window.confirm(msg)) return
+    void file.remove(node.path).catch((err: unknown) => {
+      showToast({
+        variant: "error",
+        title: language.t("fileTree.toast.deleteFailed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    })
+  }
+
+  const confirmDeleteMany = (nodes: { path: string }[]) => {
+    const msg = language.t("fileTree.delete.confirmMany", { count: nodes.length })
+    if (!window.confirm(msg)) return
+    void Promise.all(
+      nodes.map((node) =>
+        file.remove(node.path).catch((err: unknown) => {
+          showToast({
+            variant: "error",
+            title: language.t("fileTree.toast.deleteFailed"),
+            description: err instanceof Error ? err.message : String(err),
+          })
+        }),
+      ),
+    )
+  }
+
+  const fileTreeOps: FileTreeOps = {
+    onRename: async (node, next) => {
+      await file.rename(node.path, next).catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.renameFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+    },
+    onDelete: confirmDelete,
+    onDeleteMany: confirmDeleteMany,
+    onNewFile: async (dir, name) => {
+      const target = dir ? `${dir}/${name}` : name
+      await file.write(target, "").catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.writeFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+    },
+    onNewFolder: async (dir, name) => {
+      const target = dir ? `${dir}/${name}` : name
+      await file.mkdir(target).catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.mkdirFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+    },
+    onMove: async (src, dst) => {
+      await file.rename(src, dst).catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.renameFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+    },
+    onDownload: async (node) => {
+      await file.download(node.path).catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.downloadFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+    },
+    onPreview: (node) => {
+      window.open(file.serveUrl(node.path), "_blank")
+    },
+    onUpload: async (dir, items) => {
+      const entries: FileSystemEntry[] = []
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.()
+        if (entry) entries.push(entry)
+      }
+      if (entries.length === 0) return
+      setUploading(true)
+      const all: { path: string; content: string; encoding: "base64" }[] = []
+      for (const entry of entries) {
+        const sub = await readEntry(entry, dir)
+        all.push(...sub)
+      }
+      await file.upload(all).catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.upload.error"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
+      setUploading(false)
+      showToast({ title: language.t("fileTree.upload.success") })
+    },
   }
 
   createEffect(() => {
@@ -211,7 +416,7 @@ export function SessionSidePanel(props: {
         classList={{
           "pointer-events-none": !open(),
           "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-            !moving() && !props.reviewSnap,
+            !props.size.active() && !props.reviewSnap,
         }}
         style={{ width: panelWidth() }}
       >
@@ -362,7 +567,7 @@ export function SessionSidePanel(props: {
             classList={{
               "pointer-events-none": !fileOpen(),
               "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-                !moving(),
+                !props.size.active(),
             }}
             style={{ width: treeWidth() }}
           >
@@ -416,24 +621,74 @@ export function SessionSidePanel(props: {
                     </Match>
                   </Switch>
                 </Tabs.Content>
-                <Tabs.Content value="all" class="bg-background-stronger px-3 py-0">
-                  <Switch>
-                    <Match when={nofiles()}>{empty(language.t("session.files.empty"))}</Match>
-                    <Match when={true}>
-                      <FileTree
-                        path=""
-                        class="pt-3"
-                        modified={diffFiles()}
-                        kinds={kinds()}
-                        onFileClick={(node) => openTab(file.tab(node.path))}
-                      />
-                    </Match>
-                  </Switch>
+                <Tabs.Content
+                  value="all"
+                  class="bg-background-stronger px-0 py-0"
+                  onDragOver={handleUploadDragOver}
+                  onDrop={handleUploadDrop}
+                >
+                  <ContextMenu>
+                    <ContextMenu.Trigger class="flex flex-col w-full h-full px-3 py-0">
+                      <Show when={rootCreate()} keyed>
+                        {(type) => (
+                          <RootInput
+                            placeholder={
+                              type === "file"
+                                ? language.t("fileTree.toolbar.newFilePlaceholder")
+                                : language.t("fileTree.toolbar.newFolderPlaceholder")
+                            }
+                            onConfirm={(name) => {
+                              setRootCreate(null)
+                              if (!name) return
+                              if (type === "file") void fileTreeOps.onNewFile?.("", name)
+                              else void fileTreeOps.onNewFolder?.("", name)
+                            }}
+                            onCancel={() => setRootCreate(null)}
+                          />
+                        )}
+                      </Show>
+                      <Show when={uploading()}>
+                        <div class="py-2 text-center text-12-regular text-text-weak">
+                          {language.t("fileTree.upload.progress")}
+                        </div>
+                      </Show>
+                      <Switch>
+                        <Match when={nofiles()}>{empty(language.t("session.files.empty"))}</Match>
+                        <Match when={true}>
+                          <FileTree
+                            path=""
+                            class="pt-3"
+                            modified={diffFiles()}
+                            kinds={kinds()}
+                            onFileClick={(node) => openTab(file.tab(node.path))}
+                            ops={fileTreeOps}
+                          />
+                        </Match>
+                      </Switch>
+                    </ContextMenu.Trigger>
+                    <ContextMenu.Portal>
+                      <ContextMenu.Content>
+                        <ContextMenu.Item onSelect={() => setRootCreate("file")}>
+                          <Icon name="plus-small" />
+                          <ContextMenu.ItemLabel>{language.t("fileTree.toolbar.newFile")}</ContextMenu.ItemLabel>
+                        </ContextMenu.Item>
+                        <ContextMenu.Item onSelect={() => setRootCreate("folder")}>
+                          <Icon name="folder-add-left" />
+                          <ContextMenu.ItemLabel>{language.t("fileTree.toolbar.newFolder")}</ContextMenu.ItemLabel>
+                        </ContextMenu.Item>
+                        <ContextMenu.Separator />
+                        <ContextMenu.Item onSelect={() => file.tree.refresh("")}>
+                          <Icon name="refresh" />
+                          <ContextMenu.ItemLabel>{language.t("fileTree.toolbar.refresh")}</ContextMenu.ItemLabel>
+                        </ContextMenu.Item>
+                      </ContextMenu.Content>
+                    </ContextMenu.Portal>
+                  </ContextMenu>
                 </Tabs.Content>
               </Tabs>
             </div>
             <Show when={fileOpen()}>
-              <div onPointerDown={() => props.size?.start()}>
+              <div onPointerDown={() => props.size.start()}>
                 <ResizeHandle
                   direction="horizontal"
                   edge="start"
@@ -441,7 +696,7 @@ export function SessionSidePanel(props: {
                   min={200}
                   max={480}
                   onResize={(width) => {
-                    props.size?.touch()
+                    props.size.touch()
                     layout.fileTree.resize(width)
                   }}
                 />

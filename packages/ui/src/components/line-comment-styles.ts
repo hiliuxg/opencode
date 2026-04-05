@@ -192,6 +192,15 @@ export const lineCommentStyles = `
   margin-right: auto;
 }
 
+[data-component="line-comment"][data-inline][data-variant="editor"] [data-slot="line-comment-actions"] {
+  flex-wrap: nowrap;
+}
+
+[data-component="line-comment"][data-inline][data-variant="editor"] [data-slot="line-comment-editor-label"] {
+  flex-basis: auto;
+  min-width: 0;
+}
+
 [data-component="line-comment"] [data-slot="line-comment-action"] {
   border: 1px solid var(--border-base);
   background: var(--surface-base);

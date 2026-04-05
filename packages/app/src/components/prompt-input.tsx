@@ -1,9 +1,8 @@
 import { useFilteredList } from "@opencode-ai/ui/hooks"
-import { createEffect, on, Component, Show, onCleanup, Switch, Match, createMemo, createSignal } from "solid-js"
+import { createEffect, on, Component, Show, onCleanup, createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
-import { createFocusSignal } from "@solid-primitives/active-element"
 import { useLocal } from "@/context/local"
-import { useFile } from "@/context/file"
+import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import {
   ContentPart,
   DEFAULT_PROMPT,
@@ -16,7 +15,6 @@ import {
 } from "@/context/prompt"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
-import { useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 import { useComments } from "@/context/comments"
 import { Button } from "@opencode-ai/ui/button"
@@ -25,10 +23,8 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
-import { RadioGroup } from "@opencode-ai/ui/radio-group"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
-import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { SkillSelectorPopover } from "@/components/dialog-select-skill"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
@@ -36,6 +32,9 @@ import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { useSessionLayout } from "@/pages/session/session-layout"
+import { createSessionTabs } from "@/pages/session/helpers"
+import { promptEnabled, promptProbe } from "@/testing/prompt"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
@@ -43,10 +42,13 @@ import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
   prependHistoryEntry,
+  type PromptHistoryComment,
+  type PromptHistoryEntry,
+  type PromptHistoryStoredEntry,
   promptLength,
 } from "./prompt-input/history"
-import { createPromptSubmit } from "./prompt-input/submit"
-import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
+import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
+import { PromptPopover, type AtOption } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
@@ -58,6 +60,11 @@ interface PromptInputProps {
   ref?: (el: HTMLDivElement) => void
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
+  edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"] }
+  onEditLoaded?: () => void
+  shouldQueue?: () => boolean
+  onQueue?: (draft: FollowupDraft) => void
+  onAbort?: () => void
   onSubmit?: () => void
 }
 
@@ -99,17 +106,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const prompt = usePrompt()
   const layout = useLayout()
   const comments = useComments()
-  const params = useParams()
   const dialog = useDialog()
   const providers = useProviders()
   const command = useCommand()
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const { params, tabs, view } = useSessionLayout()
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
-  let slashPopoverRef!: HTMLDivElement
 
   const mirror = { input: false }
   const inset = 44
@@ -147,13 +153,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
-  const queueScroll = () => {
-    requestAnimationFrame(scrollCursorIntoView)
+  const queueScroll = (count = 2) => {
+    requestAnimationFrame(() => {
+      scrollCursorIntoView()
+      if (count > 1) queueScroll(count - 1)
+    })
   }
 
-  const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
-  const tabs = createMemo(() => layout.tabs(sessionKey))
-  const view = createMemo(() => layout.view(sessionKey))
+  const activeFileTab = createSessionTabs({
+    tabs,
+    pathFromTab: files.pathFromTab,
+    normalizeTab: (tab) => (tab.startsWith("file://") ? files.tab(tab) : tab),
+  }).activeFileTab
 
   const commentInReview = (path: string) => {
     const sessionID = params.id
@@ -170,12 +181,29 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const focus = { file: item.path, id: item.commentID }
     comments.setActive(focus)
 
+    const queueCommentFocus = (attempts = 6) => {
+      const schedule = (left: number) => {
+        requestAnimationFrame(() => {
+          comments.setFocus({ ...focus })
+          if (left <= 0) return
+          requestAnimationFrame(() => {
+            const current = comments.focus()
+            if (!current) return
+            if (current.file !== focus.file || current.id !== focus.id) return
+            schedule(left - 1)
+          })
+        })
+      }
+
+      schedule(attempts)
+    }
+
     const wantsReview = item.commentOrigin === "review" || (item.commentOrigin !== "file" && commentInReview(item.path))
     if (wantsReview) {
       if (!view().reviewPanel.opened()) view().reviewPanel.open()
       layout.fileTree.setTab("changes")
       tabs().setActive("review")
-      requestAnimationFrame(() => comments.setFocus(focus))
+      queueCommentFocus()
       return
     }
 
@@ -183,13 +211,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     layout.fileTree.setTab("all")
     const tab = files.tab(item.path)
     tabs().open(tab)
-    files.load(item.path)
-    requestAnimationFrame(() => comments.setFocus(focus))
+    tabs().setActive(tab)
+    Promise.resolve(files.load(item.path)).finally(() => queueCommentFocus())
   }
 
   const recent = createMemo(() => {
     const all = tabs().all()
-    const active = tabs().active()
+    const active = activeFileTab()
     const order = active ? [active, ...all.filter((x) => x !== active)] : all
     const seen = new Set<string>()
     const paths: string[] = []
@@ -212,14 +240,31 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       },
   )
   const working = createMemo(() => status()?.type !== "idle")
+  const tip = () => {
+    if (working()) {
+      return (
+        <div class="flex items-center gap-2">
+          <span>{language.t("prompt.action.stop")}</span>
+          <span class="text-icon-base text-12-medium text-[10px]!">{language.t("common.key.esc")}</span>
+        </div>
+      )
+    }
+
+    return (
+      <div class="flex items-center gap-2">
+        <span>{language.t("prompt.action.send")}</span>
+        <Icon name="enter" size="small" class="text-icon-base" />
+      </div>
+    )
+  }
   const imageAttachments = createMemo(() =>
     prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image"),
   )
 
   const [store, setStore] = createStore<{
-    popover: "at" | "slash" | null
+    popover: "at" | null
     historyIndex: number
-    savedPrompt: Prompt | null
+    savedPrompt: PromptHistoryEntry | null
     placeholder: number
     draggingType: "image" | "@mention" | null
     mode: "normal" | "shell"
@@ -227,7 +272,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }>({
     popover: null,
     historyIndex: -1,
-    savedPrompt: null,
+    savedPrompt: null as PromptHistoryEntry | null,
     placeholder: Math.floor(Math.random() * EXAMPLES.length),
     draggingType: null,
     mode: "normal",
@@ -256,7 +301,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [history, setHistory] = persisted(
     Persist.global("prompt-history", ["prompt-history.v1"]),
     createStore<{
-      entries: Prompt[]
+      entries: PromptHistoryStoredEntry[]
     }>({
       entries: [],
     }),
@@ -264,7 +309,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [shellHistory, setShellHistory] = persisted(
     Persist.global("prompt-history-shell", ["prompt-history-shell.v1"]),
     createStore<{
-      entries: Prompt[]
+      entries: PromptHistoryStoredEntry[]
     }>({
       entries: [],
     }),
@@ -282,9 +327,66 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }),
   )
 
-  const applyHistoryPrompt = (p: Prompt, position: "start" | "end") => {
+  const historyComments = () => {
+    const byID = new Map(comments.all().map((item) => [`${item.file}\n${item.id}`, item] as const))
+    return prompt.context.items().flatMap((item) => {
+      if (item.type !== "file") return []
+      const comment = item.comment?.trim()
+      if (!comment) return []
+
+      const selection = item.commentID ? byID.get(`${item.path}\n${item.commentID}`)?.selection : undefined
+      const nextSelection =
+        selection ??
+        (item.selection
+          ? ({
+              start: item.selection.startLine,
+              end: item.selection.endLine,
+            } satisfies SelectedLineRange)
+          : undefined)
+      if (!nextSelection) return []
+
+      return [
+        {
+          id: item.commentID ?? item.key,
+          path: item.path,
+          selection: { ...nextSelection },
+          comment,
+          time: item.commentID ? (byID.get(`${item.path}\n${item.commentID}`)?.time ?? Date.now()) : Date.now(),
+          origin: item.commentOrigin,
+          preview: item.preview,
+        } satisfies PromptHistoryComment,
+      ]
+    })
+  }
+
+  const applyHistoryComments = (items: PromptHistoryComment[]) => {
+    comments.replace(
+      items.map((item) => ({
+        id: item.id,
+        file: item.path,
+        selection: { ...item.selection },
+        comment: item.comment,
+        time: item.time,
+      })),
+    )
+    prompt.context.replaceComments(
+      items.map((item) => ({
+        type: "file" as const,
+        path: item.path,
+        selection: selectionFromLines(item.selection),
+        comment: item.comment,
+        commentID: item.id,
+        commentOrigin: item.origin,
+        preview: item.preview,
+      })),
+    )
+  }
+
+  const applyHistoryPrompt = (entry: PromptHistoryEntry, position: "start" | "end") => {
+    const p = entry.prompt
     const length = position === "start" ? 0 : promptLength(p)
     setStore("applyingHistory", true)
+    applyHistoryComments(entry.comments)
     prompt.set(p, length)
     requestAnimationFrame(() => {
       editorRef.focus()
@@ -311,7 +413,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
-  const isFocused = createFocusSignal(() => editorRef)
   const escBlur = () => platform.platform === "desktop" && platform.os === "macos"
 
   const pick = () => fileInputRef?.click()
@@ -411,6 +512,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setComposing(false)
   }
 
+  const handleCompositionStart = () => {
+    setComposing(true)
+  }
+
+  const handleCompositionEnd = () => {
+    setComposing(false)
+    requestAnimationFrame(() => {
+      if (composing()) return
+      reconcile(prompt.current().filter((part) => part.type !== "image"))
+    })
+  }
+
   const agentList = createMemo(() =>
     sync.data.agent
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
@@ -444,6 +557,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const open = recent()
       const seen = new Set(open)
       const pinned: AtOption[] = open.map((path) => ({ type: "file", path, display: path, recent: true }))
+      if (!query.trim()) return [...agents, ...pinned]
       const paths = await files.searchFilesAndDirectories(query)
       const fileOptions: AtOption[] = paths
         .filter((path) => !seen.has(path))
@@ -466,61 +580,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       return rank(a.category) - rank(b.category)
     },
     onSelect: handleAtSelect,
-  })
-
-  const slashCommands = createMemo<SlashCommand[]>(() => {
-    const builtin = command.options
-      .filter((opt) => !opt.disabled && !opt.id.startsWith("suggested.") && opt.slash)
-      .map((opt) => ({
-        id: opt.id,
-        trigger: opt.slash!,
-        title: opt.title,
-        description: opt.description,
-        keybind: opt.keybind,
-        type: "builtin" as const,
-      }))
-
-    const custom = sync.data.command.map((cmd) => ({
-      id: `custom.${cmd.name}`,
-      trigger: cmd.name,
-      title: cmd.name,
-      description: cmd.description,
-      type: "custom" as const,
-      source: cmd.source,
-    }))
-
-    return [...custom, ...builtin]
-  })
-
-  const handleSlashSelect = (cmd: SlashCommand | undefined) => {
-    if (!cmd) return
-    closePopover()
-
-    if (cmd.type === "custom") {
-      const text = `/${cmd.trigger} `
-      setEditorText(text)
-      prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
-      focusEditorEnd()
-      return
-    }
-
-    clearEditor()
-    prompt.set([{ type: "text", content: "", start: 0, end: 0 }], 0)
-    command.trigger(cmd.id, "slash")
-  }
-
-  const {
-    flat: slashFlat,
-    active: slashActive,
-    setActive: setSlashActive,
-    onInput: slashOnInput,
-    onKeyDown: slashOnKeyDown,
-    refetch: slashRefetch,
-  } = useFilteredList<SlashCommand>({
-    items: slashCommands,
-    key: (x) => x?.id,
-    filterKeys: ["trigger", "title"],
-    onSelect: handleSlashSelect,
   })
 
   const createPill = (part: FileAttachmentPart | AgentPart) => {
@@ -572,24 +631,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
-  createEffect(
-    on(
-      () => sync.data.command,
-      () => slashRefetch(),
-      { defer: true },
-    ),
-  )
-
-  // Auto-scroll active command into view when navigating with keyboard
-  createEffect(() => {
-    const activeId = slashActive()
-    if (!activeId || !slashPopoverRef) return
-
-    requestAnimationFrame(() => {
-      const element = slashPopoverRef.querySelector(`[data-slash-id="${activeId}"]`)
-      element?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  if (promptEnabled()) {
+    createEffect(() => {
+      promptProbe.set({
+        popover: store.popover,
+      })
     })
-  })
+
+    onCleanup(() => promptProbe.clear())
+  }
 
   const selectPopoverActive = () => {
     if (store.popover === "at") {
@@ -598,36 +648,30 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const active = atActive()
       const item = items.find((entry) => atKey(entry) === active) ?? items[0]
       handleAtSelect(item)
+    }
+  }
+
+  const reconcile = (input: Prompt) => {
+    if (mirror.input) {
+      mirror.input = false
+      if (isNormalizedEditor()) return
+
+      renderEditorWithCursor(input)
       return
     }
 
-    if (store.popover === "slash") {
-      const items = slashFlat()
-      if (items.length === 0) return
-      const active = slashActive()
-      const item = items.find((entry) => entry.id === active) ?? items[0]
-      handleSlashSelect(item)
-    }
+    const dom = parseFromDOM()
+    if (isNormalizedEditor() && isPromptEqual(input, dom)) return
+
+    renderEditorWithCursor(input)
   }
 
   createEffect(
     on(
       () => prompt.current(),
-      (currentParts) => {
-        const inputParts = currentParts.filter((part) => part.type !== "image")
-
-        if (mirror.input) {
-          mirror.input = false
-          if (isNormalizedEditor()) return
-
-          renderEditorWithCursor(inputParts)
-          return
-        }
-
-        const domParts = parseFromDOM()
-        if (isNormalizedEditor() && isPromptEqual(inputParts, domParts)) return
-
-        renderEditorWithCursor(inputParts)
+      (parts) => {
+        if (composing()) return
+        reconcile(parts.filter((part) => part.type !== "image"))
       },
     ),
   )
@@ -740,14 +784,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     if (!shellMode) {
       const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
-      const slashMatch = null
 
       if (atMatch) {
         atOnInput(atMatch[1])
         setStore("popover", "at")
-      } else if (slashMatch) {
-        slashOnInput(slashMatch[1])
-        setStore("popover", "slash")
       } else {
         closePopover()
       }
@@ -846,10 +886,49 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const addToHistory = (prompt: Prompt, mode: "normal" | "shell") => {
     const currentHistory = mode === "shell" ? shellHistory : history
     const setCurrentHistory = mode === "shell" ? setShellHistory : setHistory
-    const next = prependHistoryEntry(currentHistory.entries, prompt)
+    const next = prependHistoryEntry(currentHistory.entries, prompt, mode === "shell" ? [] : historyComments())
     if (next === currentHistory.entries) return
     setCurrentHistory("entries", next)
   }
+
+  createEffect(
+    on(
+      () => props.edit?.id,
+      (id) => {
+        const edit = props.edit
+        if (!id || !edit) return
+
+        for (const item of prompt.context.items()) {
+          prompt.context.remove(item.key)
+        }
+
+        for (const item of edit.context) {
+          prompt.context.add({
+            type: item.type,
+            path: item.path,
+            selection: item.selection,
+            comment: item.comment,
+            commentID: item.commentID,
+            commentOrigin: item.commentOrigin,
+            preview: item.preview,
+          })
+        }
+
+        setStore("mode", "normal")
+        setStore("popover", null)
+        setStore("historyIndex", -1)
+        setStore("savedPrompt", null)
+        prompt.set(edit.prompt, promptLength(edit.prompt))
+        requestAnimationFrame(() => {
+          editorRef.focus()
+          setCursorPosition(editorRef, promptLength(edit.prompt))
+          queueScroll()
+        })
+        props.onEditLoaded?.()
+      },
+      { defer: true },
+    ),
+  )
 
   const navigateHistory = (direction: "up" | "down") => {
     const result = navigatePromptHistory({
@@ -857,18 +936,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       entries: store.mode === "shell" ? shellHistory.entries : history.entries,
       historyIndex: store.historyIndex,
       currentPrompt: prompt.current(),
+      currentComments: historyComments(),
       savedPrompt: store.savedPrompt,
     })
     if (!result.handled) return false
     setStore("historyIndex", result.historyIndex)
     setStore("savedPrompt", result.savedPrompt)
-    applyHistoryPrompt(result.prompt, result.cursor)
+    applyHistoryPrompt(result.entry, result.cursor)
     return true
   }
 
-  const { addImageAttachment, removeImageAttachment, handlePaste } = createPromptAttachments({
+  const { addAttachments, removeAttachment, handlePaste } = createPromptAttachments({
     editor: () => editorRef,
-    isFocused,
     isDialogActive: () => !!dialog.active,
     setDraggingType: (type) => setStore("draggingType", type),
     focusEditor: () => {
@@ -879,11 +958,28 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     readClipboardImage: platform.readClipboardImage,
   })
 
+  const accepting = createMemo(() => {
+    const id = params.id
+    if (!id) return permission.isAutoAcceptingDirectory(sdk.directory)
+    return permission.isAutoAccepting(id, sdk.directory)
+  })
+  const acceptLabel = createMemo(() =>
+    language.t(accepting() ? "command.permissions.autoaccept.disable" : "command.permissions.autoaccept.enable"),
+  )
+  const toggleAccept = () => {
+    if (!params.id) {
+      permission.toggleAutoAcceptDirectory(sdk.directory)
+      return
+    }
+
+    permission.toggleAutoAccept(params.id, sdk.directory)
+  }
+
   const { abort, handleSubmit } = createPromptSubmit({
     info,
     imageAttachments,
     commentCount,
-    autoAccept: () => permission.isAutoAcceptingDirectory(sdk.directory),
+    autoAccept: () => accepting(),
     mode: () => store.mode,
     working,
     editor: () => editorRef,
@@ -897,6 +993,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setPopover: (popover) => setStore("popover", popover),
     newSessionWorktree: () => props.newSessionWorktree,
     onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
+    shouldQueue: props.shouldQueue,
+    onQueue: props.onQueue,
+    onAbort: props.onAbort,
     onSubmit: props.onSubmit,
   })
 
@@ -1003,9 +1102,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           event.preventDefault()
           return
         }
-        if (store.popover === "slash") {
-          slashOnKeyDown(event)
-        }
         event.preventDefault()
         return
       }
@@ -1044,27 +1140,33 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     // Note: Shift+Enter is handled earlier, before IME check
     if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      if (event.repeat) return
+      if (
+        working() &&
+        prompt
+          .current()
+          .map((part) => ("content" in part ? part.content : ""))
+          .join("")
+          .trim().length === 0 &&
+        imageAttachments().length === 0 &&
+        commentCount() === 0
+      ) {
+        return
+      }
       handleSubmit(event)
     }
   }
-
-  const variants = createMemo(() => ["default", ...local.model.variant.list()])
 
   return (
     <div class="relative size-full _max-h-[320px] flex flex-col gap-0">
       <PromptPopover
         popover={store.popover}
-        setSlashPopoverRef={(el) => (slashPopoverRef = el)}
         atFlat={atFlat()}
         atActive={atActive() ?? undefined}
         atKey={atKey}
         setAtActive={setAtActive}
         onAtSelect={handleAtSelect}
-        slashFlat={slashFlat()}
-        slashActive={slashActive() ?? undefined}
-        setSlashActive={setSlashActive}
-        onSlashSelect={handleSlashSelect}
-        commandKeybind={command.keybind}
         t={(key) => language.t(key as Parameters<typeof language.t>[0])}
       />
       <DockShellForm
@@ -1098,13 +1200,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onOpen={(attachment) =>
             dialog.show(() => <ImagePreview src={attachment.dataUrl} alt={attachment.filename} />)
           }
-          onRemove={removeImageAttachment}
+          onRemove={removeAttachment}
           removeLabel={language.t("prompt.attachment.remove")}
         />
         <Show when={store.mode === "normal" && local.skill.current()}>
           <div class="flex flex-nowrap items-center gap-2 px-3 pt-2">
             <div class="group shrink-0 flex items-center gap-1 h-6 rounded-full pl-2 pr-1 max-w-[200px] bg-background-stronger shadow-xs-border hover:shadow-xs-border-hover transition-all cursor-default">
-              <Icon name="brain" size="small" class="shrink-0 size-3 text-text-weak" />
+              <Icon name="knowledge-base" size="small" class="shrink-0 size-3 text-text-weak" />
               <span class="truncate text-11-regular text-text-strong font-medium">{local.skill.current()}</span>
               <IconButton
                 type="button"
@@ -1132,7 +1234,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             editorRef?.focus()
           }}
         >
-          <div class="relative max-h-[240px] overflow-y-auto no-scrollbar" ref={(el) => (scrollRef = el)}>
+          <div
+            class="relative max-h-[240px] overflow-y-auto no-scrollbar"
+            ref={(el) => (scrollRef = el)}
+          >
             <div
               data-component="prompt-input"
               ref={(el) => {
@@ -1143,13 +1248,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               aria-multiline="true"
               aria-label={placeholder()}
               contenteditable="true"
-              autocapitalize="off"
-              autocorrect="off"
-              spellcheck={false}
+              autocapitalize={store.mode === "normal" ? "sentences" : "off"}
+              autocorrect={store.mode === "normal" ? "on" : "off"}
+              spellcheck={store.mode === "normal"}
               onInput={handleInput}
               onPaste={handlePaste}
-              onCompositionStart={() => setComposing(true)}
-              onCompositionEnd={() => setComposing(false)}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               classList={{
@@ -1169,15 +1274,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </div>
             </Show>
           </div>
-
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept={ACCEPTED_FILE_TYPES.join(",")}
             class="hidden"
             onChange={(e) => {
-              const file = e.currentTarget.files?.[0]
-              if (file) addImageAttachment(file)
+              const list = e.currentTarget.files
+              if (list) void addAttachments(Array.from(list))
               e.currentTarget.value = ""
             }}
           />
@@ -1219,11 +1324,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       keybind={command.keybind("model.choose")}
                     >
                       <Button
+                        data-action="prompt-model"
                         as="div"
                         variant="ghost"
                         size="normal"
                         class="min-w-0 max-w-[320px] text-13-regular group"
-                        onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
+                        style={{ height: "28px" }}
+                        onClick={() => {
+                          void import("@/components/dialog-select-model-unpaid").then((x) => {
+                            dialog.show(() => <x.DialogSelectModelUnpaid model={local.model} />)
+                          })
+                        }}
                       >
                         <span class="truncate">
                           {local.model.current()?.name ?? language.t("dialog.model.select.title")}
@@ -1240,11 +1351,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     keybind={command.keybind("model.choose")}
                   >
                     <ModelSelectorPopover
+                      model={local.model}
                       triggerAs={Button}
                       triggerProps={{
                         variant: "ghost",
                         size: "normal",
+                        style: { height: "28px" },
                         class: "min-w-0 max-w-[320px] text-13-regular group",
+                        "data-action": "prompt-model",
                       }}
                     >
                       <span class="truncate">
@@ -1254,16 +1368,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </ModelSelectorPopover>
                   </TooltipKeybind>
                 </Show>
-                <Tooltip
-                  placement="top"
-                  gutter={4}
-                  value={language.t("command.skill.choose")}
-                >
+                <Tooltip placement="top" gutter={4} value={language.t("command.skill.choose")}>
                   <SkillSelectorPopover
                     triggerAs={Button}
                     triggerProps={{
                       variant: "ghost",
                       size: "normal",
+                      style: { height: "28px" },
                       class: "min-w-0 max-w-[200px] text-13-regular group",
                     }}
                     onSelect={(skill) => local.skill.set(skill?.name)}
@@ -1275,37 +1386,27 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </Show>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <Show when={store.mode === "normal" && permission.permissionsEnabled() && params.id}>
-                <TooltipKeybind
-                  placement="top"
-                  gutter={8}
-                  title={language.t("command.permissions.autoaccept.enable")}
-                  keybind={command.keybind("permissions.autoaccept")}
+              <TooltipKeybind
+                placement="top"
+                gutter={8}
+                title={acceptLabel()}
+                keybind={command.keybind("permissions.autoaccept")}
+              >
+                <Button
+                  data-action="prompt-permissions"
+                  variant="ghost"
+                  onClick={toggleAccept}
+                  classList={{
+                    "size-7 flex items-center justify-center": true,
+                    "text-text-base": !accepting(),
+                    "hover:bg-surface-success-base": accepting(),
+                  }}
+                  aria-label={acceptLabel()}
+                  aria-pressed={accepting()}
                 >
-                  <Button
-                    data-action="prompt-permissions"
-                    variant="ghost"
-                    onClick={() => permission.toggleAutoAccept(params.id!, sdk.directory)}
-                    classList={{
-                      "size-7 flex items-center justify-center": true,
-                      "text-text-base": !permission.isAutoAccepting(params.id!, sdk.directory),
-                      "hover:bg-surface-success-base": permission.isAutoAccepting(params.id!, sdk.directory),
-                    }}
-                    aria-label={
-                      permission.isAutoAccepting(params.id!, sdk.directory)
-                        ? language.t("command.permissions.autoaccept.disable")
-                        : language.t("command.permissions.autoaccept.enable")
-                    }
-                    aria-pressed={permission.isAutoAccepting(params.id!, sdk.directory)}
-                  >
-                    <Icon
-                      name="chevron-double-right"
-                      size="small"
-                      classList={{ "text-icon-success-base": permission.isAutoAccepting(params.id!, sdk.directory) }}
-                    />
-                  </Button>
-                </TooltipKeybind>
-              </Show>
+                  <Icon name="shield" size="small" classList={{ "text-icon-success-base": accepting() }} />
+                </Button>
+              </TooltipKeybind>
               <Show when={store.mode === "normal"}>
                 <TooltipKeybind
                   placement="top"
@@ -1324,30 +1425,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   </Button>
                 </TooltipKeybind>
               </Show>
-              <Tooltip
-                placement="top"
-                inactive={!prompt.dirty() && !working()}
-                value={
-                  <Switch>
-                    <Match when={working()}>
-                      <div class="flex items-center gap-2">
-                        <span>{language.t("prompt.action.stop")}</span>
-                        <span class="text-icon-base text-12-medium text-[10px]!">{language.t("common.key.esc")}</span>
-                      </div>
-                    </Match>
-                    <Match when={true}>
-                      <div class="flex items-center gap-2">
-                        <span>{language.t("prompt.action.send")}</span>
-                        <Icon name="enter" size="small" class="text-icon-base" />
-                      </div>
-                    </Match>
-                  </Switch>
-                }
-              >
+              <Tooltip placement="top" inactive={!prompt.dirty() && !working()} value={tip()}>
                 <IconButton
                   data-action="prompt-submit"
                   type="submit"
-                  disabled={!prompt.dirty() && !working() && commentCount() === 0}
+                  disabled={store.mode !== "normal" || (!prompt.dirty() && !working() && commentCount() === 0)}
+                  tabIndex={store.mode === "normal" ? undefined : -1}
                   icon={working() ? "stop" : "arrow-up"}
                   variant="primary"
                   class="size-8"

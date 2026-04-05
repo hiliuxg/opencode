@@ -44,7 +44,7 @@
     outline: none;
 
     font-family: var(--font-family-sans);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-x-small);
     font-weight: var(--font-weight-medium);
     line-height: var(--line-height-large);
     letter-spacing: var(--letter-spacing-normal);
@@ -83,6 +83,15 @@
 
   [data-slot="context-menu-item-label"] {
     flex: 1;
+  }
+
+  [data-slot="context-menu-item"] [data-component="icon"],
+  [data-slot="context-menu-checkbox-item"] [data-component="icon"],
+  [data-slot="context-menu-radio-item"] [data-component="icon"],
+  [data-slot="context-menu-sub-trigger"] [data-component="icon"] {
+    width: 12px;
+    height: 12px;
+    color: var(--text-strong);
   }
 
   [data-slot="context-menu-item-description"] {

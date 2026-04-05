@@ -4,6 +4,7 @@ import { makeRuntime } from "@/effect/run-service"
 import { AppFileSystem } from "@/filesystem"
 import { git } from "@/util/git"
 import { Effect, Layer, ServiceMap } from "effect"
+import archiver from "archiver"
 import { formatPatch, structuredPatch } from "diff"
 import fs from "fs"
 import fuzzysort from "fuzzysort"
@@ -337,6 +338,12 @@ export namespace File {
       dirs?: boolean
       type?: "file" | "directory"
     }) => Effect.Effect<string[]>
+    readonly write: (file: string, content: string, encoding?: "base64") => Effect.Effect<void, any>
+    readonly mkdir: (dir: string) => Effect.Effect<void, any>
+    readonly remove: (target: string) => Effect.Effect<void, any>
+    readonly rename: (old: string, next: string) => Effect.Effect<void, any>
+    readonly serve: (file: string) => Effect.Effect<{ data: Uint8Array; mime: string }, any>
+    readonly download: (target: string) => Effect.Effect<{ data: Uint8Array; filename: string; mime: string }, any>
   }
 
   export class Service extends ServiceMap.Service<Service, Interface>()("@opencode/File") {}
@@ -662,8 +669,80 @@ export namespace File {
         })
       })
 
+      const forbidden = (target: string) => {
+        const full = path.join(Instance.directory, target)
+        if (!Instance.containsPath(full)) throw new Error("Access denied: path escapes project directory")
+        const rel = path.relative(Instance.directory, full)
+        if (rel === "" || rel === ".") throw new Error("Cannot modify project root")
+        if (rel === ".git" || rel.startsWith(".git/") || rel.startsWith(".git\\"))
+          throw new Error("Cannot modify .git directory")
+        return full
+      }
+
+      const write = Effect.fn("File.write")(function* (file: string, content: string, encoding?: "base64") {
+        const full = forbidden(file)
+        const dir = path.dirname(full)
+        yield* appFs.makeDirectory(dir, { recursive: true }).pipe(Effect.catch(() => Effect.void))
+        const bytes = encoding === "base64" ? Buffer.from(content, "base64") : new TextEncoder().encode(content)
+        yield* appFs.writeFile(full, new Uint8Array(bytes))
+      })
+
+      const mkdir = Effect.fn("File.mkdir")(function* (dir: string) {
+        const full = forbidden(dir)
+        yield* appFs.makeDirectory(full, { recursive: true })
+      })
+
+      const remove = Effect.fn("File.remove")(function* (target: string) {
+        const full = forbidden(target)
+        yield* Effect.promise(() => fs.promises.rm(full, { recursive: true, force: true }))
+      })
+
+      const rename = Effect.fn("File.rename")(function* (old: string, next: string) {
+        const src = forbidden(old)
+        const dst = forbidden(next)
+        const dir = path.dirname(dst)
+        yield* appFs.makeDirectory(dir, { recursive: true }).pipe(Effect.catch(() => Effect.void))
+        yield* Effect.promise(() => fs.promises.rename(src, dst))
+      })
+
+      const serve = Effect.fn("File.serve")(function* (file: string) {
+        const full = path.join(Instance.directory, file)
+        if (!Instance.containsPath(full)) throw new Error("Access denied: path escapes project directory")
+        const data = yield* appFs.readFile(full)
+        const mimeVal = AppFileSystem.mimeType(full)
+        return { data, mime: mimeVal }
+      })
+
+      const download = Effect.fn("File.download")(function* (target: string) {
+        const full = path.join(Instance.directory, target)
+        if (!Instance.containsPath(full)) throw new Error("Access denied: path escapes project directory")
+        const stat = yield* Effect.promise(() => fs.promises.stat(full))
+        if (stat.isDirectory()) {
+          const result = yield* Effect.promise(
+            () =>
+              new Promise<Uint8Array>((ok, fail) => {
+              const chunks: Buffer[] = []
+              const archive = archiver("zip", { zlib: { level: 6 } })
+              archive.on("data", (chunk: Buffer) => chunks.push(chunk))
+              archive.on("end", () => ok(new Uint8Array(Buffer.concat(chunks))))
+              archive.on("error", fail)
+              archive.glob("**/*", {
+                cwd: full,
+                ignore: [".git/**"],
+                dot: true,
+              })
+              archive.finalize()
+            }),
+          )
+          const name = path.basename(full) || "download"
+          return { data: result, filename: `${name}.zip`, mime: "application/zip" }
+        }
+        const data = yield* appFs.readFile(full)
+        return { data, filename: path.basename(full), mime: AppFileSystem.mimeType(full) }
+      })
+
       log.info("init")
-      return Service.of({ init, status, read, list, search })
+      return Service.of({ init, status, read, list, search, write, mkdir, remove, rename, serve, download })
     }),
   )
 
@@ -689,5 +768,29 @@ export namespace File {
 
   export async function search(input: { query: string; limit?: number; dirs?: boolean; type?: "file" | "directory" }) {
     return runPromise((svc) => svc.search(input))
+  }
+
+  export async function write(file: string, content: string, encoding?: "base64") {
+    return runPromise((svc) => svc.write(file, content, encoding))
+  }
+
+  export async function mkdir(dir: string) {
+    return runPromise((svc) => svc.mkdir(dir))
+  }
+
+  export async function remove(target: string) {
+    return runPromise((svc) => svc.remove(target))
+  }
+
+  export async function rename(old: string, next: string) {
+    return runPromise((svc) => svc.rename(old, next))
+  }
+
+  export async function serve(file: string) {
+    return runPromise((svc) => svc.serve(file))
+  }
+
+  export async function download(target: string) {
+    return runPromise((svc) => svc.download(target))
   }
 }

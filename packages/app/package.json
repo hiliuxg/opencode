@@ -38,6 +38,7 @@
     "vite-plugin-solid": "catalog:"
   },
   "dependencies": {
+    "monaco-editor": "latest",
     "@kobalte/core": "catalog:",
     "@opencode-ai/sdk": "workspace:*",
     "@opencode-ai/ui": "workspace:*",
@@ -64,14 +65,12 @@
     "luxon": "catalog:",
     "marked": "catalog:",
     "marked-shiki": "catalog:",
-    "monaco-editor": "0.55.1",
     "remeda": "catalog:",
     "shiki": "catalog:",
     "solid-js": "catalog:",
     "solid-list": "catalog:",
     "tailwindcss": "catalog:",
     "virtua": "catalog:",
-    "zod": "catalog:",
-    "echarts": "6.0.0"
+    "zod": "catalog:"
   }
 }

@@ -14,6 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
+import * as echarts from "echarts"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -44,6 +45,7 @@ import { ToolErrorCard } from "./tool-error-card"
 import { Checkbox } from "./checkbox"
 import { DiffChanges } from "./diff-changes"
 import { Markdown } from "./markdown"
+import { Tabs } from "./tabs"
 import { ImagePreview } from "./image-preview"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/util/path"
 import { checksum } from "@opencode-ai/util/encode"
@@ -357,6 +359,35 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
       return {
         icon: "brain",
         title: input.name || i18n.t("ui.tool.skill"),
+      }
+    case "kudata-mcp_sql_query_result":
+      return {
+        icon: "mcp",
+        title: i18n.t("ui.tool.mcp.run_query"),
+      }
+    case "kudata-mcp_get_table_columns":
+      return {
+        icon: "mcp",
+        title: i18n.t("ui.tool.mcp.get_table_columns"),
+        subtitle: input.tablename ? `${input.engine}-${input.cluster} ${input.tablename}` : undefined,
+      }
+    case "kudata-mcp_render_chart":
+      return {
+        icon: "mcp",
+        title: i18n.t("ui.tool.mcp.render_chart"),
+        subtitle: input.title,
+      }
+    case "kudata-mcp_send_message":
+      return {
+        icon: "bubble-5",
+        title: "发送企微消息",
+        subtitle: input.content ? (input.content.length > 30 ? input.content.slice(0, 30) + "..." : input.content) : undefined,
+      }
+    case "kudata-mcp_manage_schedule":
+      return {
+        icon: "mcp",
+        title: "创建任务",
+        subtitle: input.title ? `${input.op === "create" ? "创建" : input.op === "update" ? "修改" : "删除"} · ${input.title}` : undefined,
       }
     default:
       return {
@@ -2222,21 +2253,270 @@ ToolRegistry.register({
   name: "skill",
   render(props) {
     const i18n = useI18n()
-    const title = createMemo(() => props.input.name || i18n.t("ui.tool.skill"))
+    const name = createMemo(() => props.input.name || "")
+    const description = createMemo(() => props.output || "")
     const running = createMemo(() => props.status === "pending" || props.status === "running")
-
-    const titleContent = () => <TextShimmer text={title()} active={running()} />
 
     const trigger = () => (
       <div data-slot="basic-tool-tool-info-structured">
         <div data-slot="basic-tool-tool-info-main">
-          <span data-slot="basic-tool-tool-title" class="capitalize agent-title">
-            {titleContent()}
+          <span data-slot="basic-tool-tool-title">
+            <TextShimmer text={i18n.t("ui.tool.skill.loading")} active={running()} />
           </span>
+          <Show when={name()}>
+            <span data-slot="basic-tool-tool-subtitle">{name()}</span>
+          </Show>
         </div>
       </div>
     )
 
-    return <BasicTool icon="brain" status={props.status} trigger={trigger()} hideDetails />
+    return (
+      <BasicTool icon="knowledge-base" status={props.status} trigger={trigger()}>
+        <Show when={description()}>
+            <div data-component="tool-output" data-scrollable data-type="skill">
+              {description()}
+            </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+function EChartsRenderer(props: { data: string }) {
+  let container: HTMLDivElement | undefined
+  let chart: echarts.ECharts | undefined
+
+  const parsed = createMemo(() => {
+    try {
+      return JSON.parse(props.data) as { success: boolean; message?: string; data?: Record<string, any> }
+    } catch (e) {
+      return { success: false, message: `JSON parse error: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  const options = createMemo(() => {
+    const result = parsed()
+    if (!result.success || !result.data) return null
+    const raw = result.data
+    for (const key of ["series", "xAxis", "yAxis"]) {
+      if (typeof raw[key] === "string") {
+        try { raw[key] = JSON.parse(raw[key]) } catch {}
+      }
+    }
+    return raw
+  })
+
+  createEffect(() => {
+    const data = options()
+    if (!container || !data) return
+
+    if (chart) chart.dispose()
+    chart = echarts.init(container)
+
+    const opt: Record<string, any> = {}
+    if (data.title) opt.title = { text: data.title }
+    opt.tooltip = { trigger: "axis" }
+    opt.xAxis = { type: "category", data: data.xAxis || [] }
+    opt.yAxis = { type: "value" }
+
+    const raw = Array.isArray(data.series)
+      ? data.series
+      : Object.entries(data.series || {}).map(([name, value]) => ({ name, data: value }))
+
+    const legend = raw.map((s: any) => s.name).filter(Boolean)
+    if (legend.length > 0) opt.legend = { data: legend }
+
+    opt.series = raw.map((s: any) => ({
+      ...s,
+      type: data.chart_type || s.type || "bar",
+    }))
+
+    chart.setOption(opt)
+    onCleanup(() => chart?.dispose())
+  })
+
+  return (
+    <Show
+      when={parsed().success}
+      fallback={
+        <div data-slot="mcp-chart-error">
+          Chart error: {parsed().message ?? "Unknown error"}
+        </div>
+      }
+    >
+      <Show when={options()} fallback={<div data-slot="mcp-tool-no-results">No chart data</div>}>
+        <div ref={container} style={{ width: "100%", height: "350px" }} />
+      </Show>
+    </Show>
+  )
+}
+
+function McpTabsTool(props: ToolProps & { inputName?: string; inputContent: string }) {
+  const i18n = useI18n()
+  const fileComponent = useFileComponent()
+  const info = createMemo(() => getToolInfo(props.tool, props.input))
+
+  return (
+    <BasicTool
+      {...props}
+      icon={info().icon}
+      trigger={{
+        title: info().title,
+        subtitle: info().subtitle || "",
+      }}
+    >
+      <div data-component="mcp-tool-content">
+        <Tabs defaultValue={props.input ? "input" : "output"}>
+          <Tabs.List>
+            <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.input")}</Tabs.Trigger>
+            <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.output")}</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="input">
+            <div data-slot="mcp-sql-tabs-content">
+              <Dynamic
+                component={fileComponent}
+                mode="text"
+                file={{
+                  name: props.inputName || "input.json",
+                  contents: props.inputContent,
+                  cacheKey: checksum(props.inputContent),
+                }}
+                overflow="scroll"
+              />
+            </div>
+          </Tabs.Content>
+          <Tabs.Content value="output">
+            <div data-slot="mcp-sql-tabs-content">
+              <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
+                <Dynamic
+                  component={fileComponent}
+                  mode="text"
+                  file={{
+                    name: "output.json",
+                    contents: props.output!,
+                    cacheKey: checksum(props.output!),
+                  }}
+                  overflow="scroll"
+                />
+              </Show>
+            </div>
+          </Tabs.Content>
+        </Tabs>
+      </div>
+    </BasicTool>
+  )
+}
+
+ToolRegistry.register({
+  name: "kudata-mcp_sql_query_result",
+  render(props) {
+    const i18n = useI18n()
+    const fileComponent = useFileComponent()
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+    return (
+      <BasicTool
+        {...props}
+        icon={info().icon}
+        trigger={{
+          title: i18n.t("ui.tool.mcp.run_query"),
+          subtitle: `${props.input.engine}-${props.input.cluster}`,
+        }}
+      >
+        <div data-component="mcp-tool-content">
+          <Tabs defaultValue={props.input ? "input" : "output"}>
+            <Tabs.List>
+              <Tabs.Trigger value="input">{i18n.t("ui.tool.mcp.run_query.input")}</Tabs.Trigger>
+              <Tabs.Trigger value="output">{i18n.t("ui.tool.mcp.run_query.output")}</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="input">
+              <div data-slot="mcp-sql-tabs-content">
+                <Dynamic
+                  component={fileComponent}
+                  mode="text"
+                  file={{
+                    name: "input.sql",
+                    contents: props.input.query ?? "",
+                    cacheKey: checksum(props.input.query ?? ""),
+                  }}
+                  overflow="scroll"
+                />
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="output">
+              <div data-slot="mcp-sql-tabs-content">
+                <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
+                  <Dynamic
+                    component={fileComponent}
+                    mode="text"
+                    file={{
+                      name: "output.json",
+                      contents: props.output!,
+                      cacheKey: checksum(props.output!),
+                    }}
+                    overflow="scroll"
+                  />
+                </Show>
+              </div>
+            </Tabs.Content>
+          </Tabs>
+        </div>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_get_table_columns",
+  render(props) {
+    const content = createMemo(() => {
+      try { return JSON.stringify(props.input, null, 2) }
+      catch { return String(props.input) }
+    })
+    return <McpTabsTool {...props} inputName="input.json" inputContent={content()} />
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_render_chart",
+  render(props) {
+    const info = createMemo(() => getToolInfo(props.tool, props.input))
+    return (
+      <BasicTool
+        {...props}
+        defaultOpen
+        forceOpen={!!props.output}
+        icon={info().icon}
+        trigger={{
+          title: info().title,
+          subtitle: info().subtitle || "",
+        }}
+      >
+        <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">Loading chart...</div>}>
+          {(output) => <EChartsRenderer data={output()} />}
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_send_message",
+  render(props) {
+    const content = createMemo(() => {
+      try { return JSON.stringify(props.input, null, 2) }
+      catch { return String(props.input) }
+    })
+    return <McpTabsTool {...props} inputName="input.json" inputContent={content()} />
+  },
+})
+
+ToolRegistry.register({
+  name: "kudata-mcp_manage_schedule",
+  render(props) {
+    const content = createMemo(() => {
+      try { return JSON.stringify(props.input, null, 2) }
+      catch { return String(props.input) }
+    })
+    return <McpTabsTool {...props} inputName="input.json" inputContent={content()} />
   },
 })

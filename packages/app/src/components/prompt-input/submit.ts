@@ -43,6 +43,7 @@ type FollowupSendInput = {
   draft: FollowupDraft
   messageID?: string
   optimisticBusy?: boolean
+  textOverride?: string
   before?: () => Promise<boolean> | boolean
 }
 
@@ -52,6 +53,7 @@ const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttac
 
 export async function sendFollowupDraft(input: FollowupSendInput) {
   const text = draftText(input.draft.prompt)
+  const finalText = input.textOverride ?? text
   const images = draftImages(input.draft.prompt)
   const [, setStore] = input.globalSync.child(input.draft.sessionDirectory)
 
@@ -71,44 +73,12 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
     return true
   }
 
-  const [head, ...tail] = text.split(" ")
-  const cmd = head?.startsWith("/") ? head.slice(1) : undefined
-  if (cmd && input.sync.data.command.find((item) => item.name === cmd)) {
-    setBusy()
-    try {
-      if (!(await wait())) {
-        setIdle()
-        return false
-      }
-
-      await input.client.session.command({
-        sessionID: input.draft.sessionID,
-        command: cmd,
-        arguments: tail.join(" "),
-        agent: input.draft.agent,
-        model: `${input.draft.model.providerID}/${input.draft.model.modelID}`,
-        variant: input.draft.variant,
-        parts: images.map((attachment) => ({
-          id: Identifier.ascending("part"),
-          type: "file" as const,
-          mime: attachment.mime,
-          url: attachment.dataUrl,
-          filename: attachment.filename,
-        })),
-      })
-      return true
-    } catch (err) {
-      setIdle()
-      throw err
-    }
-  }
-
   const messageID = input.messageID ?? Identifier.ascending("message")
   const { requestParts, optimisticParts } = buildRequestParts({
     prompt: input.draft.prompt,
     context: input.draft.context,
     images,
-    text,
+    text: finalText,
     sessionID: input.draft.sessionID,
     messageID,
     sessionDirectory: input.draft.sessionDirectory,
@@ -178,7 +148,7 @@ type PromptSubmitInput = {
   addToHistory: (prompt: Prompt, mode: "normal" | "shell") => void
   resetHistoryNavigation: () => void
   setMode: (mode: "normal" | "shell") => void
-  setPopover: (popover: "at" | "slash" | null) => void
+  setPopover: (popover: "at" | null) => void
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void
   shouldQueue?: Accessor<boolean>
@@ -448,54 +418,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    if (text.startsWith("/")) {
-      const [cmdName, ...args] = text.split(" ")
-      const commandName = cmdName.slice(1)
-      const customCommand = sync.data.command.find((c) => c.name === commandName)
-      if (customCommand) {
-        clearInput()
-        client.session
-          .command({
-            sessionID: session.id,
-            command: commandName,
-            arguments: args.join(" "),
-            agent,
-            model: `${model.providerID}/${model.modelID}`,
-            variant,
-            parts: images.map((attachment) => ({
-              id: Identifier.ascending("part"),
-              type: "file" as const,
-              mime: attachment.mime,
-              url: attachment.dataUrl,
-              filename: attachment.filename,
-            })),
-          })
-          .catch((err) => {
-            showToast({
-              title: language.t("prompt.toast.commandSendFailed.title"),
-              description: formatServerError(err, language.t, language.t("common.requestFailed")),
-            })
-            restoreInput()
-          })
-        return
-      }
-    }
-
     const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
-
-    const skill = local.skill.current()
-    const finalText = skill ? `使用\`${skill}\` 技能回答问题 \n\n${text}` : text
-
     const messageID = Identifier.ascending("message")
-    const { requestParts, optimisticParts } = buildRequestParts({
-      prompt: currentPrompt,
-      context,
-      images,
-      text: finalText,
-      sessionID: session.id,
-      messageID,
-      sessionDirectory,
-    })
+    const skill = local.skill.current()
+    const textOverride = skill ? `使用\`${skill}\` 技能回答问题 \n\n${text}` : undefined
 
     const removeOptimisticMessage = () => {
       sync.session.optimistic.remove({
@@ -570,6 +496,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       draft,
       messageID,
       optimisticBusy: sessionDirectory === projectDirectory,
+      textOverride,
       before: waitForWorktree,
     }).catch((err) => {
       pending.delete(session.id)

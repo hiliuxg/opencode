@@ -40,11 +40,7 @@ const SkillList = (props: {
       onSelect={props.onSelect}
     >
       {(skill) => (
-        <Tooltip
-          placement="right-start"
-          value={skill.description}
-          disabled={!skill.description}
-        >
+        <Tooltip placement="right-start" value={skill.description} disabled={!skill.description}>
           <div class="w-full flex flex-col min-w-0 text-left py-1">
             <span class="text-13-medium text-text-strong">{skill.name}</span>
             <span class="text-12-regular text-text-weak text-left truncate">{skill.description}</span>

@@ -245,6 +245,79 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       viewCache.clear()
     })
 
+    const parentDir = (p: string) => {
+      const idx = p.lastIndexOf("/")
+      return idx === -1 ? "" : p.slice(0, idx)
+    }
+
+    const write = async (target: string, content: string, encoding?: "base64") => {
+      const name = target.split("/").pop() || target
+      tree.insertNode({ name, path: target, absolute: target, type: "file", ignored: false })
+      await sdk.client.file.write({ path: target, content, encoding })
+      void tree.listDir(parentDir(target), { force: true })
+    }
+
+    const mkdirOp = async (target: string) => {
+      const name = target.split("/").pop() || target
+      tree.insertNode({ name, path: target, absolute: target, type: "directory", ignored: false })
+      await sdk.client.file.mkdir({ path: target })
+      void tree.listDir(parentDir(target), { force: true })
+    }
+
+    const remove = async (target: string) => {
+      await sdk.client.file.delete({ path: target })
+      void tree.listDir(parentDir(target), { force: true })
+    }
+
+    const renameOp = async (old: string, next: string) => {
+      await sdk.client.file.rename({ oldPath: old, newPath: next })
+      void tree.listDir(parentDir(old), { force: true })
+      const dst = parentDir(next)
+      if (dst !== parentDir(old)) void tree.listDir(dst, { force: true })
+    }
+
+    const upload = async (files: { path: string; content: string; encoding?: "base64" }[]) => {
+      const dirs = new Set<string>()
+      for (const f of files) {
+        const dir = parentDir(f.path)
+        if (dir && !dirs.has(dir)) {
+          dirs.add(dir)
+          await sdk.client.file.mkdir({ path: dir }).catch(() => {})
+        }
+        await sdk.client.file.write({ path: f.path, content: f.content, encoding: f.encoding })
+      }
+      void tree.listDir("", { force: true })
+    }
+
+    const downloadFile = async (target: string) => {
+      const url = new URL(`/file/download`, sdk.url)
+      url.searchParams.set("path", target)
+      url.searchParams.set("directory", sdk.directory)
+      const resp = await fetch(url.toString())
+      if (!resp.ok) throw new Error("Download failed")
+      const blob = await resp.blob()
+      const disposition = resp.headers.get("content-disposition")
+      let filename = target.split("/").pop() || "download"
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match) filename = decodeURIComponent(match[1])
+      }
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(a.href)
+    }
+
+    const serveUrl = (target: string) => {
+      const url = new URL(`/file/serve`, sdk.url)
+      url.searchParams.set("path", target)
+      url.searchParams.set("directory", sdk.directory)
+      return url.toString()
+    }
+
     return {
       ready: () => view().ready(),
       normalize: path.normalize,
@@ -275,6 +348,13 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       setSelectedLines,
       searchFiles: (query: string) => search(query, "false"),
       searchFilesAndDirectories: (query: string) => search(query, "true"),
+      write,
+      mkdir: mkdirOp,
+      remove,
+      rename: renameOp,
+      upload,
+      download: downloadFile,
+      serveUrl,
     }
   },
 })

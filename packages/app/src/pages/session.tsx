@@ -21,7 +21,7 @@ import { usePrompt } from "@/context/prompt"
 import { useComments } from "@/context/comments"
 import { SessionHeader, NewSessionView } from "@/components/session"
 import { same } from "@/utils/same"
-import { createOpenReviewFile } from "@/pages/session/helpers"
+import { createOpenReviewFile, createSizing } from "@/pages/session/helpers"
 import { SessionReviewTab, type DiffStyle, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { MessageTimeline } from "@/pages/session/message-timeline"
@@ -107,6 +107,9 @@ export default function Page() {
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
   const centered = createMemo(() => isDesktop() && !desktopSidePanelOpen())
+
+  const fileTreeSize = createSizing()
+  const reviewSize = createSizing()
 
   function normalizeTab(tab: string) {
     if (!tab.startsWith("file://")) return tab
@@ -1122,17 +1125,28 @@ export default function Page() {
           />
 
           <Show when={desktopReviewOpen()}>
-            <ResizeHandle
-              direction="horizontal"
-              size={layout.session.width()}
-              min={450}
-              max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
-              onResize={layout.session.resize}
-            />
+            <div onPointerDown={() => reviewSize.start()}>
+              <ResizeHandle
+                direction="horizontal"
+                size={layout.session.width()}
+                min={450}
+                max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
+                onResize={(width) => {
+                  reviewSize.touch()
+                  layout.session.resize(width)
+                }}
+              />
+            </div>
           </Show>
         </div>
 
-        <SessionSidePanel reviewPanel={reviewPanel} activeDiff={tree.activeDiff} focusReviewDiff={focusReviewDiff} />
+        <SessionSidePanel
+          reviewPanel={reviewPanel}
+          activeDiff={tree.activeDiff}
+          focusReviewDiff={focusReviewDiff}
+          reviewSnap={reviewSize.active()}
+          size={fileTreeSize}
+        />
       </div>
 
       <TerminalPanel />

@@ -142,6 +142,16 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
   const handleGlobalDragOver = (event: DragEvent) => {
     if (input.isDialogActive()) return
 
+    if (event.dataTransfer?.types.includes("application/x-filetree-move")) {
+      const overTree = event.composedPath().some(
+        (el) => el instanceof HTMLElement && el.dataset.component === "filetree",
+      )
+      if (overTree) return
+      event.preventDefault()
+      input.setDraggingType("@mention")
+      return
+    }
+
     event.preventDefault()
     const hasFiles = event.dataTransfer?.types.includes("Files")
     const hasText = event.dataTransfer?.types.includes("text/plain")
@@ -159,11 +169,23 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
     }
   }
 
+  const handleGlobalDragEnd = () => {
+    input.setDraggingType(null)
+  }
+
   const handleGlobalDrop = async (event: DragEvent) => {
     if (input.isDialogActive()) return
 
-    event.preventDefault()
+    // Always clear overlay first (capture phase fires before stopPropagation takes effect)
     input.setDraggingType(null)
+
+    // If dropped on the file tree, let the tree handle it
+    const overTree = event.composedPath().some(
+      (el) => el instanceof HTMLElement && el.dataset.component === "filetree",
+    )
+    if (overTree) return
+
+    event.preventDefault()
 
     const plainText = event.dataTransfer?.getData("text/plain")
     const filePrefix = "file:"
@@ -183,13 +205,15 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
   onMount(() => {
     document.addEventListener("dragover", handleGlobalDragOver)
     document.addEventListener("dragleave", handleGlobalDragLeave)
-    document.addEventListener("drop", handleGlobalDrop)
+    document.addEventListener("drop", handleGlobalDrop, { capture: true })
+    document.addEventListener("dragend", handleGlobalDragEnd)
   })
 
   onCleanup(() => {
     document.removeEventListener("dragover", handleGlobalDragOver)
     document.removeEventListener("dragleave", handleGlobalDragLeave)
-    document.removeEventListener("drop", handleGlobalDrop)
+    document.removeEventListener("drop", handleGlobalDrop, { capture: true })
+    document.removeEventListener("dragend", handleGlobalDragEnd)
   })
 
   return {

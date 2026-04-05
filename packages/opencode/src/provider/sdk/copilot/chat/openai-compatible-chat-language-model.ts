@@ -61,6 +61,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
   private readonly chunkSchema // type inferred via constructor
 
   constructor(modelId: OpenAICompatibleChatModelId, config: OpenAICompatibleChatConfig) {
+    console.log("[OpenAICompatibleChatLanguageModel] constructor called", { modelId, provider: config.provider })
     this.modelId = modelId
     this.config = config
 
@@ -303,6 +304,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
   }
 
   async doStream(options: LanguageModelV3CallOptions) {
+    console.log("[OpenAICompatibleChatLanguageModel] doStream called", { modelId: this.modelId, provider: this.provider })
     const { args, warnings } = await this.getArgs({ ...options })
 
     const body = {
@@ -337,7 +339,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
       }
       hasFinished: boolean
     }> = []
-    const toolCallIndexById = new Map<string, number>()
 
     let finishReason: {
       unified: ReturnType<typeof mapOpenAICompatibleFinishReason>
@@ -452,19 +453,21 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
             }
 
             const choice = value.choices[0]
+            const delta = choice?.delta
 
             if (choice?.finish_reason != null) {
+              const hasTools = toolCalls.length > 0 || (delta?.tool_calls != null && delta.tool_calls.length > 0)
+              const raw = hasTools && choice.finish_reason === "stop" ? "tool_calls" : choice.finish_reason
+              console.log("[OpenAICompatibleChatLanguageModel] finish_reason", { original: choice.finish_reason, corrected: raw, hasTools, toolCallsCount: toolCalls.length })
               finishReason = {
-                unified: mapOpenAICompatibleFinishReason(choice.finish_reason),
-                raw: choice.finish_reason ?? undefined,
+                unified: mapOpenAICompatibleFinishReason(raw),
+                raw: raw ?? undefined,
               }
             }
 
-            if (choice?.delta == null) {
+            if (delta == null) {
               return
             }
-
-            const delta = choice.delta
 
             // Capture reasoning_opaque for Copilot multi-turn reasoning
             if (delta.reasoning_opaque) {
@@ -536,20 +539,24 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 isActiveReasoning = false
               }
               for (const toolCallDelta of delta.tool_calls) {
-                const index =
-                  toolCallDelta.index ??
-                  (toolCallDelta.id != null ? toolCallIndexById.get(toolCallDelta.id) : undefined) ??
-                  (() => {
-                    const active = toolCalls
-                      .map((toolCall, index) => (toolCall != null && !toolCall.hasFinished ? index : undefined))
-                      .filter((value): value is number => value != null)
-                    if (active.length === 1) {
-                      return active[0]
-                    }
-                    return toolCalls.length
-                  })()
+                let index = toolCallDelta.index
+                if (index == null) {
+                  if (toolCallDelta.id && toolCallDelta.function?.name) {
+                    index = toolCalls.length
+                  } else {
+                    const last = toolCalls.findLastIndex((tc) => !tc.hasFinished)
+                    index = last >= 0 ? last : toolCalls.length
+                  }
+                }
 
                 if (toolCalls[index] == null) {
+                  if (toolCallDelta.id == null) {
+                    throw new InvalidResponseDataError({
+                      data: toolCallDelta,
+                      message: `Expected 'id' to be a string.`,
+                    })
+                  }
+
                   if (toolCallDelta.function?.name == null) {
                     throw new InvalidResponseDataError({
                       data: toolCallDelta,
@@ -557,16 +564,14 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                     })
                   }
 
-                  const toolCallId = toolCallDelta.id ?? generateId()
-
                   controller.enqueue({
                     type: "tool-input-start",
-                    id: toolCallId,
+                    id: toolCallDelta.id,
                     toolName: toolCallDelta.function.name,
                   })
 
                   toolCalls[index] = {
-                    id: toolCallId,
+                    id: toolCallDelta.id,
                     type: "function",
                     function: {
                       name: toolCallDelta.function.name,
@@ -574,7 +579,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                     },
                     hasFinished: false,
                   }
-                  toolCallIndexById.set(toolCallId, index)
 
                   const toolCall = toolCalls[index]
 
@@ -612,9 +616,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
                 // existing tool call, merge if not finished
                 const toolCall = toolCalls[index]
-                if (toolCallDelta.id != null) {
-                  toolCallIndexById.set(toolCallDelta.id, index)
-                }
 
                 if (toolCall.hasFinished) {
                   continue

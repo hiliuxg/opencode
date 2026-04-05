@@ -1,11 +1,15 @@
 import { useFile } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
+import { useLanguage } from "@/context/language"
 import { Collapsible } from "@opencode-ai/ui/collapsible"
+import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { Icon } from "@opencode-ai/ui/icon"
+import { showToast } from "@opencode-ai/ui/toast"
 import {
   createEffect,
   createMemo,
+  createSignal,
   For,
   Match,
   on,
@@ -14,7 +18,6 @@ import {
   Switch,
   untrack,
   type ComponentProps,
-  type JSXElement,
   type ParentProps,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
@@ -108,6 +111,47 @@ const withFileDragImage = (event: DragEvent) => {
   setTimeout(() => document.body.removeChild(image), 0)
 }
 
+const isHtml = (name: string) => /\.html?$/i.test(name)
+
+function InlineInput(props: {
+  level: number
+  initial?: string
+  onConfirm: (value: string) => void
+  onCancel: () => void
+}) {
+  let ref: HTMLInputElement | undefined
+  const [val, setVal] = createSignal(props.initial ?? "")
+
+  const confirm = () => {
+    const v = val().trim()
+    if (!v || v === props.initial) {
+      props.onCancel()
+      return
+    }
+    props.onConfirm(v)
+  }
+
+  createEffect(() => {
+    ref?.focus()
+    if (props.initial) ref?.select()
+  })
+
+  return (
+    <input
+      ref={ref}
+      class="w-full h-6 bg-surface-raised-base border border-border-base rounded-md px-1.5 text-12-medium text-text-strong outline-none focus:ring-1 focus:ring-border-focus"
+      style={`margin-left: ${Math.max(0, 8 + props.level * 12)}px`}
+      value={val()}
+      onInput={(e) => setVal(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") confirm()
+        if (e.key === "Escape") props.onCancel()
+      }}
+      onBlur={confirm}
+    />
+  )
+}
+
 const FileTreeNode = (
   p: ParentProps &
     ComponentProps<"div"> &
@@ -120,6 +164,7 @@ const FileTreeNode = (
       kinds?: ReadonlyMap<string, Kind>
       marks?: Set<string>
       as?: "div" | "button"
+      dropTarget?: boolean
     },
 ) => {
   const [local, rest] = splitProps(p, [
@@ -134,6 +179,7 @@ const FileTreeNode = (
     "children",
     "class",
     "classList",
+    "dropTarget",
   ])
   const kind = () => visibleKind(local.node, local.kinds, local.marks)
   const active = () => !!kind() && !local.node.ignored
@@ -149,6 +195,7 @@ const FileTreeNode = (
       classList={{
         "w-full min-w-0 h-6 flex items-center justify-start gap-x-1.5 rounded-md px-1.5 py-0 text-left hover:bg-surface-raised-base-hover active:bg-surface-base-active transition-colors cursor-pointer": true,
         "bg-surface-base-active": local.node.path === local.active,
+        "ring-1 ring-border-focus": !!local.dropTarget,
         ...(local.classList ?? {}),
         [local.class ?? ""]: !!local.class,
         [local.nodeClass ?? ""]: !!local.nodeClass,
@@ -159,7 +206,8 @@ const FileTreeNode = (
         if (!local.draggable) return
         event.dataTransfer?.setData("text/plain", `file:${local.node.path}`)
         event.dataTransfer?.setData("text/uri-list", pathToFileUrl(local.node.path))
-        if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy"
+        event.dataTransfer?.setData("application/x-filetree-move", "1")
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"
         withFileDragImage(event)
       }}
       {...rest}
@@ -191,6 +239,17 @@ const FileTreeNode = (
   )
 }
 
+export type FileTreeOps = {
+  onRename?: (node: FileNode, name: string) => void
+  onDelete?: (node: FileNode) => void
+  onNewFile?: (dir: string, name: string) => void
+  onNewFolder?: (dir: string, name: string) => void
+  onMove?: (src: string, dst: string) => void
+  onDownload?: (node: FileNode) => void
+  onPreview?: (node: FileNode) => void
+  onUpload?: (dir: string, items: DataTransferItemList) => void
+}
+
 export default function FileTree(props: {
   path: string
   class?: string
@@ -202,6 +261,7 @@ export default function FileTree(props: {
   kinds?: ReadonlyMap<string, Kind>
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
+  ops?: FileTreeOps
 
   _filter?: Filter
   _marks?: Set<string>
@@ -210,6 +270,7 @@ export default function FileTree(props: {
   _chain?: readonly string[]
 }) {
   const file = useFile()
+  const language = useLanguage()
   const level = props.level ?? 0
   const draggable = () => props.draggable ?? true
 
@@ -219,6 +280,9 @@ export default function FileTree(props: {
       .replace(/[\\/]+$/, "")
       .replaceAll("\\", "/")
   const chain = props._chain ? [...props._chain, key(props.path)] : [key(props.path)]
+
+  const [editing, setEditing] = createSignal<{ path: string; type: "rename" | "newFile" | "newFolder" } | null>(null)
+  const [dropTarget, setDropTarget] = createSignal<string | null>(null)
 
   const filter = createMemo(() => {
     if (props._filter) return props._filter
@@ -384,124 +448,301 @@ export default function FileTree(props: {
     return out
   })
 
-  return (
-    <div data-component="filetree" class={`flex flex-col gap-0.5 ${props.class ?? ""}`}>
-      <For each={nodes()}>
-        {(node) => {
-          const expanded = () => file.tree.state(node.path)?.expanded ?? false
-          const deep = () => deeps().get(node.path) ?? -1
-          const kind = () => visibleKind(node, kinds(), marks())
-          const active = () => !!kind() && !node.ignored
+  const handleDirDragOver = (dirPath: string, e: DragEvent) => {
+    const types = e.dataTransfer?.types
+    const isTree = types?.includes("text/plain")
+    const isOs = types?.includes("Files")
+    if (!isTree && !isOs) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = isOs ? "copy" : "move"
+    setDropTarget(dirPath)
+  }
 
-          return (
-            <Switch>
-              <Match when={node.type === "directory"}>
-                <Collapsible
-                  variant="ghost"
-                  class="w-full"
-                  data-scope="filetree"
-                  forceMount={false}
-                  open={expanded()}
-                  onOpenChange={(open) => (open ? file.tree.expand(node.path) : file.tree.collapse(node.path))}
-                >
-                  <Collapsible.Trigger>
-                    <FileTreeNode
-                      node={node}
-                      level={level}
-                      active={props.active}
-                      nodeClass={props.nodeClass}
-                      draggable={draggable()}
-                      kinds={kinds()}
-                      marks={marks()}
-                    >
-                      <div class="size-4 flex items-center justify-center text-icon-weak">
-                        <Icon name={expanded() ? "chevron-down" : "chevron-right"} size="small" />
-                      </div>
-                    </FileTreeNode>
-                  </Collapsible.Trigger>
-                  <Collapsible.Content class="relative pt-0.5">
-                    <div
-                      classList={{
-                        "absolute top-0 bottom-0 w-px pointer-events-none bg-border-weak-base opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none": true,
-                        "group-hover/filetree:opacity-100": expanded() && deep() === level,
-                        "group-hover/filetree:opacity-50": !(expanded() && deep() === level),
-                      }}
-                      style={`left: ${Math.max(0, 8 + level * 12 - 4) + 8}px`}
-                    />
-                    <Show
-                      when={level < MAX_DEPTH && !chain.includes(key(node.path))}
-                      fallback={<div class="px-2 py-1 text-12-regular text-text-weak">...</div>}
-                    >
-                      <FileTree
-                        path={node.path}
-                        level={level + 1}
-                        allowed={props.allowed}
-                        modified={props.modified}
-                        kinds={props.kinds}
-                        active={props.active}
-                        draggable={props.draggable}
-                        onFileClick={props.onFileClick}
-                        _filter={filter()}
-                        _marks={marks()}
-                        _deeps={deeps()}
-                        _kinds={kinds()}
-                        _chain={chain}
-                      />
-                    </Show>
-                  </Collapsible.Content>
-                </Collapsible>
-              </Match>
-              <Match when={node.type === "file"}>
-                <FileTreeNode
-                  node={node}
-                  level={level}
-                  active={props.active}
-                  nodeClass={props.nodeClass}
-                  draggable={draggable()}
-                  kinds={kinds()}
-                  marks={marks()}
-                  as="button"
-                  type="button"
-                  onClick={() => props.onFileClick?.(node)}
-                >
-                  <div class="w-4 shrink-0" />
-                  <Switch>
-                    <Match when={node.ignored}>
-                      <FileIcon
-                        node={node}
-                        class="size-4 filetree-icon filetree-icon--mono"
-                        style="color: var(--icon-weak-base)"
-                        mono
-                      />
-                    </Match>
-                    <Match when={active()}>
-                      <FileIcon
-                        node={node}
-                        class="size-4 filetree-icon filetree-icon--mono"
-                        style={kindTextColor(kind()!)}
-                        mono
-                      />
-                    </Match>
-                    <Match when={!node.ignored}>
-                      <span class="filetree-iconpair size-4">
-                        <FileIcon
-                          node={node}
-                          class="size-4 filetree-icon filetree-icon--color opacity-0 group-hover/filetree:opacity-100"
-                        />
-                        <FileIcon
-                          node={node}
-                          class="size-4 filetree-icon filetree-icon--mono group-hover/filetree:opacity-0"
-                          mono
-                        />
-                      </span>
-                    </Match>
-                  </Switch>
-                </FileTreeNode>
-              </Match>
-            </Switch>
-          )
-        }}
-      </For>
+  const handleDirDragLeave = (dirPath: string) => {
+    if (dropTarget() === dirPath) setDropTarget(null)
+  }
+
+  const handleDirDrop = (dirPath: string, e: DragEvent) => {
+    setDropTarget(null)
+    const raw = e.dataTransfer?.getData("text/plain")
+    if (raw?.startsWith("file:")) {
+      e.preventDefault()
+      e.stopPropagation()
+      const src = raw.slice(5)
+      if (src === dirPath) return
+      if (dirPath.startsWith(src + "/")) return
+      const name = src.split("/").pop()
+      if (!name) return
+      const dst = dirPath ? `${dirPath}/${name}` : name
+      if (src === dst) return
+      props.ops?.onMove?.(src, dst)
+      return
+    }
+    const items = e.dataTransfer?.items
+    if (!items || !Array.from(items).some((i) => i.kind === "file")) return
+    e.preventDefault()
+    e.stopPropagation()
+    props.ops?.onUpload?.(dirPath, items)
+  }
+
+  const fileMenu = (node: FileNode) => (
+    <>
+      <ContextMenu.Item onSelect={() => props.onFileClick?.(node)}>
+        <Icon name="open-file" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.open")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => props.ops?.onDownload?.(node)}>
+        <Icon name="download" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.download")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "rename" })}>
+        <Icon name="pencil-line" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.rename")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => props.ops?.onDelete?.(node)}>
+        <Icon name="trash" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.delete")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <Show when={isHtml(node.name)}>
+        <ContextMenu.Separator />
+        <ContextMenu.Item onSelect={() => props.ops?.onPreview?.(node)}>
+          <Icon name="eye" />
+          <ContextMenu.ItemLabel>{language.t("fileTree.menu.preview")}</ContextMenu.ItemLabel>
+        </ContextMenu.Item>
+      </Show>
+    </>
+  )
+
+  const dirMenu = (node: FileNode) => (
+    <>
+      <ContextMenu.Item onSelect={() => props.ops?.onDownload?.(node)}>
+        <Icon name="download" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.download")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Separator />
+      <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "newFile" })}>
+        <Icon name="plus-small" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.newFile")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "newFolder" })}>
+        <Icon name="folder-add-left" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.newFolder")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Separator />
+      <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "rename" })}>
+        <Icon name="pencil-line" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.rename")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => props.ops?.onDelete?.(node)}>
+        <Icon name="trash" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.deleteFolder")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+    </>
+  )
+
+  const handleRename = (node: FileNode, name: string) => {
+    setEditing(null)
+    if (name === node.name) return
+    const parent = node.path.lastIndexOf("/") === -1 ? "" : node.path.slice(0, node.path.lastIndexOf("/"))
+    const next = parent ? `${parent}/${name}` : name
+    props.ops?.onRename?.(node, next)
+  }
+
+  const handleNew = (dir: string, type: "newFile" | "newFolder", name: string) => {
+    setEditing(null)
+    if (type === "newFile") props.ops?.onNewFile?.(dir, name)
+    else props.ops?.onNewFolder?.(dir, name)
+  }
+
+  const hasOps = () => !!props.ops
+
+  const renderNode = (node: FileNode) => {
+    const expanded = () => file.tree.state(node.path)?.expanded ?? false
+    const deep = () => deeps().get(node.path) ?? -1
+    const ed = () => editing()
+    const isRenaming = () => ed()?.path === node.path && ed()?.type === "rename"
+    const isNewInDir = () => ed()?.path === node.path && (ed()?.type === "newFile" || ed()?.type === "newFolder")
+
+    return (
+      <Switch>
+        <Match when={node.type === "directory"}>
+          <Show when={hasOps()} fallback={renderDirNoMenu(node, expanded, deep)}>
+            <ContextMenu>
+              <ContextMenu.Trigger class="w-full">
+                {renderDirCore(node, expanded, deep, isRenaming, isNewInDir)}
+              </ContextMenu.Trigger>
+              <ContextMenu.Portal>
+                <ContextMenu.Content class="context-menu-content">{dirMenu(node)}</ContextMenu.Content>
+              </ContextMenu.Portal>
+            </ContextMenu>
+          </Show>
+        </Match>
+        <Match when={node.type === "file"}>
+          <Show when={hasOps()} fallback={renderFileNoMenu(node)}>
+            <Show when={!isRenaming()} fallback={<InlineInput level={level} initial={node.name} onConfirm={(v) => handleRename(node, v)} onCancel={() => setEditing(null)} />}>
+              <ContextMenu>
+                <ContextMenu.Trigger class="w-full">
+                  {renderFileCore(node)}
+                </ContextMenu.Trigger>
+                <ContextMenu.Portal>
+                  <ContextMenu.Content class="context-menu-content">{fileMenu(node)}</ContextMenu.Content>
+                </ContextMenu.Portal>
+              </ContextMenu>
+            </Show>
+          </Show>
+        </Match>
+      </Switch>
+    )
+  }
+
+  const renderFileIcon = (node: FileNode) => {
+    const kind = () => visibleKind(node, kinds(), marks())
+    const active = () => !!kind() && !node.ignored
+
+    return (
+      <Switch>
+        <Match when={node.ignored}>
+          <FileIcon node={node} class="size-4 filetree-icon filetree-icon--mono" style="color: var(--icon-weak-base)" mono />
+        </Match>
+        <Match when={active()}>
+          <FileIcon node={node} class="size-4 filetree-icon filetree-icon--mono" style={kindTextColor(kind()!)} mono />
+        </Match>
+        <Match when={!node.ignored}>
+          <span class="filetree-iconpair size-4">
+            <FileIcon node={node} class="size-4 filetree-icon filetree-icon--color opacity-0 group-hover/filetree:opacity-100" />
+            <FileIcon node={node} class="size-4 filetree-icon filetree-icon--mono group-hover/filetree:opacity-0" mono />
+          </span>
+        </Match>
+      </Switch>
+    )
+  }
+
+  const renderFileCore = (node: FileNode) => (
+    <FileTreeNode
+      node={node}
+      level={level}
+      active={props.active}
+      nodeClass={props.nodeClass}
+      draggable={draggable()}
+      kinds={kinds()}
+      marks={marks()}
+      as="button"
+      type="button"
+      onClick={() => props.onFileClick?.(node)}
+    >
+      <div class="w-4 shrink-0" />
+      {renderFileIcon(node)}
+    </FileTreeNode>
+  )
+
+  const renderFileNoMenu = (node: FileNode) => renderFileCore(node)
+
+  const renderDirCore = (
+    node: FileNode,
+    expanded: () => boolean,
+    deep: () => number,
+    isRenaming: () => boolean,
+    isNewInDir: () => boolean,
+  ) => (
+    <Collapsible
+      variant="ghost"
+      class="w-full"
+      data-scope="filetree"
+      forceMount={false}
+      open={expanded()}
+      onOpenChange={(open) => (open ? file.tree.expand(node.path) : file.tree.collapse(node.path))}
+    >
+      <Collapsible.Trigger>
+        <Show
+          when={!isRenaming()}
+          fallback={<InlineInput level={level} initial={node.name} onConfirm={(v) => handleRename(node, v)} onCancel={() => setEditing(null)} />}
+        >
+          <FileTreeNode
+            node={node}
+            level={level}
+            active={props.active}
+            nodeClass={props.nodeClass}
+            draggable={draggable()}
+            kinds={kinds()}
+            marks={marks()}
+            dropTarget={dropTarget() === node.path}
+            onDragOver={(e: DragEvent) => handleDirDragOver(node.path, e)}
+            onDragLeave={() => handleDirDragLeave(node.path)}
+            onDrop={(e: DragEvent) => handleDirDrop(node.path, e)}
+          >
+            <div class="size-4 flex items-center justify-center text-icon-weak">
+              <Icon name={expanded() ? "chevron-down" : "chevron-right"} size="small" />
+            </div>
+          </FileTreeNode>
+        </Show>
+      </Collapsible.Trigger>
+      <Collapsible.Content class="relative pt-0.5">
+        <div
+          classList={{
+            "absolute top-0 bottom-0 w-px pointer-events-none bg-border-weak-base opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none": true,
+            "group-hover/filetree:opacity-100": expanded() && deep() === level,
+            "group-hover/filetree:opacity-50": !(expanded() && deep() === level),
+          }}
+          style={`left: ${Math.max(0, 8 + level * 12 - 4) + 8}px`}
+        />
+        <Show when={isNewInDir()}>
+          <InlineInput
+            level={level + 1}
+            onConfirm={(v) => handleNew(node.path, editing()!.type as "newFile" | "newFolder", v)}
+            onCancel={() => setEditing(null)}
+          />
+        </Show>
+        <Show
+          when={level < MAX_DEPTH && !chain.includes(key(node.path))}
+          fallback={<div class="px-2 py-1 text-12-regular text-text-weak">...</div>}
+        >
+          <FileTree
+            path={node.path}
+            level={level + 1}
+            allowed={props.allowed}
+            modified={props.modified}
+            kinds={props.kinds}
+            active={props.active}
+            draggable={props.draggable}
+            onFileClick={props.onFileClick}
+            ops={props.ops}
+            _filter={filter()}
+            _marks={marks()}
+            _deeps={deeps()}
+            _kinds={kinds()}
+            _chain={chain}
+          />
+        </Show>
+      </Collapsible.Content>
+    </Collapsible>
+  )
+
+  const renderDirNoMenu = (node: FileNode, expanded: () => boolean, deep: () => number) =>
+    renderDirCore(node, expanded, deep, () => false, () => false)
+
+  return (
+    <div
+      data-component="filetree"
+      class={`flex flex-col gap-0.5 ${props.class ?? ""}`}
+      classList={{
+        "flex-1 min-h-0": level === 0,
+        "ring-1 ring-inset ring-border-focus rounded-sm": level === 0 && dropTarget() === "",
+      }}
+      onDragOver={(e: DragEvent) => {
+        if (level !== 0) return
+        handleDirDragOver("", e)
+      }}
+      onDragLeave={(e: DragEvent) => {
+        if (level !== 0) return
+        if (dropTarget() === "") setDropTarget(null)
+      }}
+      onDrop={(e: DragEvent) => {
+        if (level !== 0) return
+        handleDirDrop("", e)
+      }}
+    >
+      <For each={nodes()}>{renderNode}</For>
     </div>
   )
 }

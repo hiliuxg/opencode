@@ -1,15 +1,11 @@
 import { Hono } from "hono"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
-import fs from "fs"
-import nodePath from "path"
 import { File } from "../../file"
 import { Ripgrep } from "../../file/ripgrep"
 import { LSP } from "../../lsp"
 import { Instance } from "../../project/instance"
 import { lazy } from "../../util/lazy"
-import { Filesystem } from "../../util/filesystem"
-import { errors } from "../error"
 
 export const FileRoutes = lazy(() =>
   new Hono()
@@ -147,48 +143,6 @@ export const FileRoutes = lazy(() =>
         return c.json(content)
       },
     )
-    .delete(
-      "/file",
-      describeRoute({
-        summary: "Delete file or directory",
-        description:
-          "Delete a specified file or directory from the project. If `path` points to a file, only that file is removed; if it points to a directory, the directory and all of its contents are removed. Use the `directory` query parameter to select the project instance, consistent with other file routes.",
-        operationId: "file.delete",
-        responses: {
-          200: {
-            description: "Success",
-            content: {
-              "application/json": {
-                schema: resolver(z.object({ success: z.boolean() })),
-              },
-            },
-          },
-        },
-      }),
-      validator(
-        "query",
-        z.object({
-          directory: z.string().optional(),
-          path: z.string(),
-        }),
-      ),
-      async (c) => {
-        const query = c.req.valid("query")
-        const full = nodePath.resolve(Instance.directory, query.path)
-        if (!Instance.containsPath(full)) {
-          return c.json({ error: "Access denied: path escapes project directory" }, 403)
-        }
-        const root = nodePath.resolve(Instance.directory)
-        if (full === root) {
-          return c.json({ error: "Cannot delete project root directory" }, 400)
-        }
-        if (!(await Filesystem.exists(full))) {
-          return c.json({ error: "Path not found" }, 404)
-        }
-        await fs.promises.rm(full, { recursive: true })
-        return c.json({ success: true })
-      },
-    )
     .get(
       "/file/content",
       describeRoute({
@@ -240,130 +194,142 @@ export const FileRoutes = lazy(() =>
         return c.json(content)
       },
     )
-    .put(
-      "/file/content",
+    .post(
+      "/file/write",
       describeRoute({
         summary: "Write file",
-        description: "Write content to a specified file.",
+        description: "Write or upload a single file. Use encoding base64 for binary files.",
         operationId: "file.write",
         responses: {
           200: {
             description: "Success",
+            content: { "application/json": { schema: resolver(z.boolean()) } },
           },
         },
       }),
       validator(
-        "query",
-        z.object({
-          path: z.string(),
-        }),
-      ),
-      validator(
         "json",
         z.object({
+          path: z.string(),
           content: z.string(),
+          encoding: z.literal("base64").optional(),
         }),
       ),
       async (c) => {
-        const query = c.req.valid("query")
         const body = c.req.valid("json")
-        await File.write(query.path, body.content)
-        return c.json({ success: true })
+        await File.write(body.path, body.content, body.encoding)
+        return c.json(true)
+      },
+    )
+    .post(
+      "/file/mkdir",
+      describeRoute({
+        summary: "Create directory",
+        description: "Recursively create a directory.",
+        operationId: "file.mkdir",
+        responses: {
+          200: {
+            description: "Success",
+            content: { "application/json": { schema: resolver(z.boolean()) } },
+          },
+        },
+      }),
+      validator("json", z.object({ path: z.string() })),
+      async (c) => {
+        await File.mkdir(c.req.valid("json").path)
+        return c.json(true)
+      },
+    )
+    .post(
+      "/file/delete",
+      describeRoute({
+        summary: "Delete file or directory",
+        description: "Delete a file or directory (recursive for directories).",
+        operationId: "file.delete",
+        responses: {
+          200: {
+            description: "Success",
+            content: { "application/json": { schema: resolver(z.boolean()) } },
+          },
+        },
+      }),
+      validator("json", z.object({ path: z.string() })),
+      async (c) => {
+        await File.remove(c.req.valid("json").path)
+        return c.json(true)
+      },
+    )
+    .post(
+      "/file/rename",
+      describeRoute({
+        summary: "Rename or move file",
+        description: "Rename or move a file or directory.",
+        operationId: "file.rename",
+        responses: {
+          200: {
+            description: "Success",
+            content: { "application/json": { schema: resolver(z.boolean()) } },
+          },
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          oldPath: z.string(),
+          newPath: z.string(),
+        }),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        await File.rename(body.oldPath, body.newPath)
+        return c.json(true)
+      },
+    )
+    .get(
+      "/file/serve",
+      describeRoute({
+        summary: "Serve file",
+        description: "Return raw file content with correct Content-Type for inline preview.",
+        operationId: "file.serve",
+        responses: {
+          200: {
+            description: "File content",
+          },
+        },
+      }),
+      validator("query", z.object({ path: z.string() })),
+      async (c) => {
+        const result = await File.serve(c.req.valid("query").path)
+        return new Response(Buffer.from(result.data), {
+          headers: {
+            "Content-Type": result.mime,
+            "Cache-Control": "no-cache",
+          },
+        })
       },
     )
     .get(
       "/file/download",
       describeRoute({
-        summary: "Download file",
-        description: "Download a specified file from the project.",
+        summary: "Download file or directory",
+        description:
+          "Download a file directly or a directory as a zip archive.",
         operationId: "file.download",
         responses: {
           200: {
-            description: "File content",
-            content: {
-              "application/octet-stream": {
-                schema: resolver(z.string()),
-              },
-            },
+            description: "File or zip download",
           },
         },
       }),
-      validator(
-        "query",
-        z.object({
-          path: z.string(),
-        }),
-      ),
+      validator("query", z.object({ path: z.string() })),
       async (c) => {
-        const filePath = c.req.valid("query").path
-        const full = nodePath.resolve(Instance.directory, filePath)
-        if (!Instance.containsPath(full)) {
-          return c.json({ error: "Access denied: path escapes project directory" }, 403)
-        }
-        const file = Bun.file(full)
-        if (!(await file.exists())) {
-          return c.json({ error: "File not found" }, 404)
-        }
-        const filename = nodePath.basename(full)
-        const encoded = encodeURIComponent(filename)
-        c.header("Content-Disposition", `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`)
-        c.header("Content-Type", file.type || "application/octet-stream")
-        return c.body(file.stream())
-      },
-    )
-    .get(
-      "/file/view",
-      describeRoute({
-        summary: "View file in browser",
-        description: "View file content directly in browser. Supports HTML (rendered), PDF (inline), and text files.",
-        operationId: "file.view",
-        responses: {
-          200: {
-            description: "File content rendered in browser",
+        const result = await File.download(c.req.valid("query").path)
+        return new Response(Buffer.from(result.data), {
+          headers: {
+            "Content-Type": result.mime,
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(result.filename)}"`,
           },
-          ...errors(400, 403, 404),
-        },
-      }),
-      validator(
-        "query",
-        z.object({
-          path: z.string().describe("Absolute path to the file to view"),
-        }),
-      ),
-      async (c) => {
-        const filePath = c.req.valid("query").path
-        const full = nodePath.resolve(Instance.directory, filePath)
-        if (!Instance.containsPath(full)) {
-          return c.json({ error: "Access denied: path escapes project directory" }, 403)
-        }
-        if (!(await Filesystem.exists(full))) {
-          return c.json({ error: "File not found" }, 404)
-        }
-
-        const lowerPath = full.toLowerCase()
-
-        // PDF files - return binary for browser to render inline
-        if (lowerPath.endsWith(".pdf")) {
-          const buffer = await Filesystem.readBytes(full)
-          c.header("Content-Type", "application/pdf")
-          c.header("Content-Disposition", "inline")
-          return c.body(new Uint8Array(buffer))
-        }
-
-        // HTML files - return text/html for browser to render
-        if (lowerPath.endsWith(".html") || lowerPath.endsWith(".htm")) {
-          const content = await Filesystem.readText(full)
-          c.header("Content-Type", "text/html; charset=utf-8")
-          return c.body(content)
-        }
-
-        // Text files - return text/plain
-        const content = await File.read(filePath)
-        if (content.type === "binary") {
-          return c.json({ error: "Binary files cannot be viewed in browser. Use /file/download instead." }, 400)
-        }
-        c.header("Content-Type", "text/plain; charset=utf-8")
-        return c.body(content.content)
+        })
       },
     ),
 )

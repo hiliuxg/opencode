@@ -157,6 +157,28 @@ export function createFileTreeStore(options: TreeStoreOptions) {
     return out
   }
 
+  const insertNode = (node: FileNode) => {
+    setTree("node", node.path, node)
+    const parent = node.path.lastIndexOf("/") === -1 ? "" : node.path.slice(0, node.path.lastIndexOf("/"))
+    const dir = options.normalizeDir(parent)
+    ensureDir(dir)
+    setTree(
+      "dir",
+      dir,
+      produce((draft) => {
+        const prev = draft.children ?? []
+        if (prev.includes(node.path)) return
+        const next = [...prev, node.path].sort((a, b) => {
+          const na = tree.node[a]
+          const nb = tree.node[b]
+          if (na && nb && na.type !== nb.type) return na.type === "directory" ? -1 : 1
+          return a.localeCompare(b)
+        })
+        draft.children = next
+      }),
+    )
+  }
+
   return {
     listDir,
     expandDir,
@@ -166,5 +188,6 @@ export function createFileTreeStore(options: TreeStoreOptions) {
     node: (path: string) => tree.node[path],
     isLoaded: (path: string) => Boolean(tree.dir[path]?.loaded),
     reset,
+    insertNode,
   }
 }
