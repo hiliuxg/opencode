@@ -246,6 +246,7 @@ const FileTreeNode = (
 export type FileTreeOps = {
   onRename?: (node: FileNode, name: string) => void
   onDelete?: (node: FileNode) => void
+  onDeleteMany?: (nodes: { path: string }[]) => void
   onNewFile?: (dir: string, name: string) => void
   onNewFolder?: (dir: string, name: string) => void
   onMove?: (src: string, dst: string) => void

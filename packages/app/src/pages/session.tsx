@@ -11,10 +11,10 @@ import { Mark } from "@opencode-ai/ui/logo"
 
 import { useSync } from "@/context/sync"
 import { useLayout } from "@/context/layout"
-import { checksum, base64Encode } from "@opencode-ai/util/encode"
+import { checksum } from "@opencode-ai/util/encode"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
-import { useNavigate, useParams } from "@solidjs/router"
+import { useParams } from "@solidjs/router"
 import { UserMessage } from "@opencode-ai/sdk/v2"
 import { useSDK } from "@/context/sdk"
 import { usePrompt } from "@/context/prompt"
@@ -39,7 +39,6 @@ export default function Page() {
   const dialog = useDialog()
   const language = useLanguage()
   const params = useParams()
-  const navigate = useNavigate()
   const sdk = useSDK()
   const prompt = usePrompt()
   const comments = useComments()
@@ -455,6 +454,7 @@ export default function Page() {
     showAllFiles,
     tabForPath: file.tab,
     openTab: tabs().open,
+    setActive: tabs().setActive,
     loadFile: file.load,
   })
 
@@ -947,13 +947,15 @@ export default function Page() {
     sessionID: () => params.id,
     messagesReady,
     visibleUserMessages,
+    historyMore,
+    historyLoading,
+    loadMore: (id) => sync.session.history.loadMore(id),
     turnStart: () => store.turnStart,
     currentMessageId: () => store.messageId,
     pendingMessage: () => ui.pendingMessage,
     setPendingMessage: (value) => setUi("pendingMessage", value),
     setActiveMessage,
     setTurnStart: (value) => setStore("turnStart", value),
-    scheduleTurnBackfill,
     autoScroll,
     scroller: () => scroller,
     anchor,
@@ -1052,7 +1054,8 @@ export default function Page() {
                     onAutoScrollHandleScroll={autoScroll.handleScroll}
                     onMarkScrollGesture={markScrollGesture}
                     hasScrollGesture={hasScrollGesture}
-                    isDesktop={isDesktop()}
+                    onTurnBackfillScroll={scheduleTurnBackfill}
+                    onUserScroll={() => autoScroll.pause()}
                     onAutoScrollInteraction={autoScroll.handleInteraction}
                     centered={centered()}
                     setContentRef={(el) => {
@@ -1063,7 +1066,6 @@ export default function Page() {
                       if (root) scheduleScrollState(root)
                     }}
                     turnStart={store.turnStart}
-                    onRenderEarlier={() => setStore("turnStart", 0)}
                     historyMore={historyMore()}
                     historyLoading={historyLoading()}
                     onLoadEarlier={() => {
@@ -1078,36 +1080,14 @@ export default function Page() {
                 </Show>
               </Match>
               <Match when={true}>
-                <NewSessionView
-                  worktree={newSessionWorktree()}
-                  onWorktreeChange={(value) => {
-                    if (value === "create") {
-                      setStore("newSessionWorktree", value)
-                      return
-                    }
-
-                    setStore("newSessionWorktree", "main")
-
-                    const target = value === "main" ? sync.project?.worktree : value
-                    if (!target) return
-                    if (target === sdk.directory) return
-                    layout.projects.open(target)
-                    navigate(`/${base64Encode(target)}/session`)
-                  }}
-                  onTopicClick={(question) => {
-                    prompt.set([{ type: "text", content: question, start: 0, end: question.length }], question.length)
-                    requestAnimationFrame(() => {
-                      const btn = document.querySelector<HTMLButtonElement>('[data-action="prompt-submit"]')
-                      btn?.click()
-                    })
-                  }}
-                />
+                <NewSessionView worktree={newSessionWorktree()} />
               </Match>
             </Switch>
           </div>
 
           <SessionComposerRegion
             state={composer}
+            ready={prompt.ready()}
             centered={centered()}
             inputRef={(el) => {
               inputRef = el
