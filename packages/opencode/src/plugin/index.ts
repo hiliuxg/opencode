@@ -126,7 +126,7 @@ export namespace Plugin {
             worktree: ctx.worktree,
             directory: ctx.directory,
             get serverUrl(): URL {
-              return Server.url ?? new URL("http://localhost:4096")
+              return Server.url()
             },
             $: Bun.$,
           }
