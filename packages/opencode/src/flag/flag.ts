@@ -38,6 +38,7 @@ export namespace Flag {
   export const OPENCODE_DISABLE_EXTERNAL_SKILLS =
     OPENCODE_DISABLE_CLAUDE_CODE_SKILLS || truthy("OPENCODE_DISABLE_EXTERNAL_SKILLS")
   export declare const OPENCODE_DISABLE_PROJECT_CONFIG: boolean
+  export declare const OPENCODE_GLOBAL_PLUGIN_INSTALL_ONLY: boolean
   export const OPENCODE_FAKE_VCS = process.env["OPENCODE_FAKE_VCS"]
   export declare const OPENCODE_CLIENT: string
   export const OPENCODE_SERVER_PASSWORD = process.env["OPENCODE_SERVER_PASSWORD"]
@@ -109,6 +110,17 @@ export namespace Flag {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
   }
 }
+
+// Dynamic getter for OPENCODE_GLOBAL_PLUGIN_INSTALL_ONLY
+// When true, plugin dependencies are only installed in the global config dir (~/.config/opencode),
+// skipping home-level (~/.opencode) and project-level (.opencode) directories.
+Object.defineProperty(Flag, "OPENCODE_GLOBAL_PLUGIN_INSTALL_ONLY", {
+  get() {
+    return truthy("OPENCODE_GLOBAL_PLUGIN_INSTALL_ONLY")
+  },
+  enumerable: true,
+  configurable: false,
+})
 
 // Dynamic getter for OPENCODE_DISABLE_PROJECT_CONFIG
 // This must be evaluated at access time, not module load time,

@@ -13,10 +13,10 @@ const MODEL_NAME = "GPT-5.4"
 
 const DEFAULT_CONFIG_TEMPLATE = `{
     "$schema": "https://opencode.ai/config.json",
-    "model": "${PROVIDER_ID}/${MODEL_NAME}",
+    "model": "tme-continue-provider/GPT-5.4",
     "provider": {
-        "${PROVIDER_ID}": {
-            "npm": "@ai-sdk/openai-compatible",
+        "tme-continue-provider": {
+            "npm": "@ai-sdk/github-copilot",
             "name": "tme-continue",
             "options": {
                 "baseURL": "https://continue.tmeoa.com/open/xcode/v1",
@@ -29,74 +29,131 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 "Claude-Sonnet-4.5": {
                     "name": "Claude-Sonnet-4.5",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "Claude-Sonnet-4.6": {
                     "name": "Claude-Sonnet-4.6",
                     "modalities": {
-                       "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "DeepSeek-V3.2": {
                     "name": "DeepSeek-V3.2"
                 },
-                "GLM-4.7": {
-                    "name": "GLM-4.7"
-                },
                 "GLM-5": {
                     "name": "GLM-5"
-                },
-                "GPT-5-mini": {
-                    "name": "GPT-5-mini",
-                    "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
-                    }
-                },
-                "GPT-5.1": {
-                    "name": "GPT-5.1",
-                    "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
-                    }
                 },
                 "GPT-5.2": {
                     "name": "GPT-5.2",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "GPT-5.4": {
                     "name": "GPT-5.4",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "Gemini-3-Flash": {
                     "name": "Gemini-3-Flash",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "Gemini-3.1-Pro": {
                     "name": "Gemini-3.1-Pro",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
                 },
                 "Kimi-K2.5": {
                     "name": "Kimi-K2.5",
                     "modalities": {
-                        "input": ["text", "image", "pdf"],
-                        "output": ["text"]
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
                     }
+                },
+                "GPT-5.4-mini": {
+                    "name": "GPT-5.4-mini",
+                    "modalities": {
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
+                    }
+                },
+                "GPT-5.4-nano": {
+                    "name": "GPT-5.4-nano",
+                    "modalities": {
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
+                    }
+                },
+                "TME DeepSeek-V3.1-Terminus": {
+                    "name": "TME DeepSeek-V3.1-Terminus"
+                },
+                "TME DeepSeek-V3.2": {
+                    "name": "TME DeepSeek-V3.2"
                 }
             }
         }

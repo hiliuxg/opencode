@@ -828,7 +828,8 @@ export namespace Server {
             parsed.username = name
             parsed.password = marketToken
             const authedUrl = parsed.toString()
-            log.info("[skill/push] built auth url", { host: parsed.host, pathname: parsed.pathname, username: parsed.username })
+            const repoName = parsed.pathname.split("/").pop()?.replace(/\.git$/, "") ?? ""
+            log.info("[skill/push] built auth url", { host: parsed.host, pathname: parsed.pathname, username: parsed.username, repoName })
 
             Bun.spawnSync(["git", "add", "-A"], { cwd: repoDir })
             log.info("[skill/push] git add -A done")
@@ -903,10 +904,9 @@ export namespace Server {
             const finalBranch = new TextDecoder().decode(finalBranchProc.stdout).trim()
             log.info("[skill/push] push successful", { newBranch, finalBranch, originalBranch })
 
-            const cleanUrl = remoteUrl.replace(/\.git$/, "").replace(/:\/\/[^@]+@/, "://").replace(/\/$/, "")
-            const branchUrl = `${cleanUrl}/-/tree/${newBranch}`
-            log.info("[skill/push] returning success", { newBranch, branchUrl, repoDir })
-            return c.json({ status: "pushed" as const, branchUrl })
+            const marketUrl = `https://kudata-agent.tmeoa.com/skill-market/${repoName}`
+            log.info("[skill/push] returning success", { newBranch, marketUrl, repoDir })
+            return c.json({ status: "pushed" as const, "branchUrl": marketUrl })
           },
         )
         .get(
@@ -1135,6 +1135,8 @@ export namespace Server {
           return headers(response)
         }) as unknown as Hono,
   )
+
+  export const Default = App
 
   export async function openapi() {
     // Cast to break excessive type recursion from long route chains

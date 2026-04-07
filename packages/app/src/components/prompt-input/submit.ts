@@ -374,7 +374,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       prompt.reset()
       input.setMode("normal")
       input.setPopover(null)
-      local.skill.set(undefined)
+      local.skill.set([])
     }
 
     const restoreInput = () => {
@@ -420,8 +420,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
     const messageID = Identifier.ascending("message")
-    const skill = local.skill.current()
-    const textOverride = skill ? `使用\`${skill}\` 技能回答问题 \n\n${text}` : undefined
+    const skills = local.skill.current()
+    const textOverride =
+      skills.length > 0
+        ? `使用 ${skills.map((s) => `\`${s}\``).join("、")} 技能回答问题 \n\n${text}`
+        : undefined
 
     const removeOptimisticMessage = () => {
       sync.session.optimistic.remove({

@@ -8,7 +8,7 @@ import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Mark } from "@opencode-ai/ui/logo"
-import { showToast } from "@opencode-ai/ui/toast"
+import { showToast, toaster } from "@opencode-ai/ui/toast"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent as SolidDndDragEvent } from "@thisbeyond/solid-dnd"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
@@ -251,21 +251,27 @@ export function SessionSidePanel(props: {
     }
     if (entries.length === 0) return
 
+    showToast({ title: language.t("fileTree.upload.start") })
     setUploading(true)
+    const tid = showToast({ variant: "loading", title: language.t("fileTree.upload.progress"), persistent: true })
     const all: { path: string; content: string; encoding: "base64" }[] = []
     for (const entry of entries) {
       const sub = await readEntry(entry, "")
       all.push(...sub)
     }
-    await file.upload(all).catch((err: unknown) => {
+    let uploadErr: unknown
+    await file.upload(all).catch((err: unknown) => { uploadErr = err })
+    toaster.dismiss(tid)
+    setUploading(false)
+    if (uploadErr) {
       showToast({
         variant: "error",
         title: language.t("fileTree.upload.error"),
-        description: err instanceof Error ? err.message : String(err),
+        description: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
       })
-    })
-    setUploading(false)
-    showToast({ title: language.t("fileTree.upload.success") })
+    } else {
+      showToast({ title: language.t("fileTree.upload.success") })
+    }
   }
 
   const handleUploadDragOver = (e: DragEvent) => {
@@ -281,7 +287,9 @@ export function SessionSidePanel(props: {
       ? language.t("fileTree.delete.confirmFolder", { name: node.name })
       : language.t("fileTree.delete.confirmFile", { name: node.name })
     if (!window.confirm(msg)) return
-    void file.remove(node.path).catch((err: unknown) => {
+    void file.remove(node.path).then(() => {
+      showToast({ variant: "success", title: language.t("fileTree.toast.deleteSuccess") })
+    }).catch((err: unknown) => {
       showToast({
         variant: "error",
         title: language.t("fileTree.toast.deleteFailed"),
@@ -303,7 +311,9 @@ export function SessionSidePanel(props: {
           })
         }),
       ),
-    )
+    ).then(() => {
+      showToast({ variant: "success", title: language.t("fileTree.toast.deleteSuccess") })
+    })
   }
 
   const fileTreeOps: FileTreeOps = {
@@ -366,21 +376,27 @@ export function SessionSidePanel(props: {
         if (entry) entries.push(entry)
       }
       if (entries.length === 0) return
+      showToast({ title: language.t("fileTree.upload.start") })
       setUploading(true)
+      const tid = showToast({ variant: "loading", title: language.t("fileTree.upload.progress"), persistent: true })
       const all: { path: string; content: string; encoding: "base64" }[] = []
       for (const entry of entries) {
         const sub = await readEntry(entry, dir)
         all.push(...sub)
       }
-      await file.upload(all).catch((err: unknown) => {
+      let uploadErr: unknown
+      await file.upload(all).catch((err: unknown) => { uploadErr = err })
+      toaster.dismiss(tid)
+      setUploading(false)
+      if (uploadErr) {
         showToast({
           variant: "error",
           title: language.t("fileTree.upload.error"),
-          description: err instanceof Error ? err.message : String(err),
+          description: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
         })
-      })
-      setUploading(false)
-      showToast({ title: language.t("fileTree.upload.success") })
+      } else {
+        showToast({ title: language.t("fileTree.upload.success") })
+      }
     },
   }
 

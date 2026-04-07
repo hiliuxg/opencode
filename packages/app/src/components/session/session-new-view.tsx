@@ -27,12 +27,14 @@ export function NewSessionView(props: NewSessionViewProps) {
     if (options().includes(selection)) return selection
     return MAIN_WORKTREE
   })
-  const projectRoot = createMemo(() => sync.project?.worktree ?? sdk.directory)
+
+  const projectRoot = createMemo(() => sdk.directory)
   const isWorktree = createMemo(() => {
     const project = sync.project
     if (!project) return false
     return sdk.directory !== project.worktree
   })
+  console.log("isWorktree", isWorktree)
 
   const label = (value: string) => {
     if (value === MAIN_WORKTREE) {

@@ -254,6 +254,9 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       const name = target.split("/").pop() || target
       tree.insertNode({ name, path: target, absolute: target, type: "file", ignored: false })
       await sdk.client.file.write({ path: target, content, encoding })
+      const file = path.normalize(target)
+      if (store.file[file]?.loaded)
+        setLoaded(file, { type: encoding === "base64" ? "binary" : "text", content })
       void tree.listDir(parentDir(target), { force: true })
     }
 
@@ -290,7 +293,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
     }
 
     const downloadFile = async (target: string) => {
-      const url = new URL(`/file/download`, sdk.url)
+      const url = new URL(`${sdk.url.replace(/\/$/, "")}/file/download`)
       url.searchParams.set("path", target)
       url.searchParams.set("directory", sdk.directory)
       const resp = await fetch(url.toString())
@@ -312,7 +315,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
     }
 
     const serveUrl = (target: string) => {
-      const url = new URL(`/file/serve`, sdk.url)
+      const url = new URL(`${sdk.url.replace(/\/$/, "")}/file/serve`)
       url.searchParams.set("path", target)
       url.searchParams.set("directory", sdk.directory)
       return url.toString()

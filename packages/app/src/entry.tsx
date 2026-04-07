@@ -97,11 +97,21 @@ if (!(root instanceof HTMLElement) && import.meta.env.DEV) {
   throw new Error(getRootNotFoundError())
 }
 
+/** Same path prefix as Vite `base` (from OPENCODE_BASE_PATH at app build). Required for API calls when the server uses Hono basePath. */
+const apiPath = () => {
+  const raw = import.meta.env.BASE_URL ?? "/"
+  const trimmed = raw.replace(/\/$/, "")
+  if (trimmed === "" || trimmed === "/") return ""
+  return trimmed
+}
+
 const getCurrentUrl = () => {
   if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
-  if (import.meta.env.DEV)
-    return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
-  return location.origin
+  const prefix = apiPath()
+  const origin = import.meta.env.DEV
+    ? `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
+    : location.origin
+  return prefix ? `${origin}${prefix}` : origin
 }
 
 const getDefaultUrl = () => {

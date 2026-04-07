@@ -1354,14 +1354,17 @@ export namespace Config {
               }
             }
 
-            const dep = iife(async () => {
-              const stale = await needsInstall(dir)
-              if (stale) await installDependencies(dir)
-            })
-            void dep.catch((err) => {
-              log.warn("background dependency install failed", { dir, error: err })
-            })
-            deps.push(dep)
+            const isGlobal = dir === Global.Path.config || dir === Flag.OPENCODE_CONFIG_DIR
+            if (!Flag.OPENCODE_GLOBAL_PLUGIN_INSTALL_ONLY || isGlobal) {
+              const dep = iife(async () => {
+                const stale = await needsInstall(dir)
+                if (stale) await installDependencies(dir)
+              })
+              void dep.catch((err) => {
+                log.warn("background dependency install failed", { dir, error: err })
+              })
+              deps.push(dep)
+            }
 
             result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => loadCommand(dir)))
             result.agent = mergeDeep(result.agent, yield* Effect.promise(() => loadAgent(dir)))

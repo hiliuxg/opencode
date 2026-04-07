@@ -9,6 +9,8 @@ import { SDKProvider } from "@/context/sdk"
 import { SyncProvider, useSync } from "@/context/sync"
 import { decode64 } from "@/utils/base64"
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, "")
+
 function DirectoryDataProvider(props: ParentProps<{ directory: string }>) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -34,7 +36,7 @@ function DirectoryDataProvider(props: ParentProps<{ directory: string }>) {
       data={sync.data}
       directory={props.directory}
       onNavigateToSession={(sessionID: string) => navigate(`/${slug()}/session/${sessionID}`)}
-      onSessionHref={(sessionID: string) => `/${slug()}/session/${sessionID}`}
+      onSessionHref={(sessionID: string) => `${base}/${slug()}/session/${sessionID}`}
     >
       <LocalProvider>{props.children}</LocalProvider>
     </DataProvider>

@@ -121,13 +121,17 @@ function InlineInput(props: {
 }) {
   let ref: HTMLInputElement | undefined
   const [val, setVal] = createSignal(props.initial ?? "")
+  let done = false
 
   const confirm = () => {
+    if (done) return
     const v = val().trim()
     if (!v || v === props.initial) {
+      done = true
       props.onCancel()
       return
     }
+    done = true
     props.onConfirm(v)
   }
 

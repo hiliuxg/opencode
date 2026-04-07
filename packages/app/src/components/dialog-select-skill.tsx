@@ -2,12 +2,13 @@ import { Popover as Kobalte } from "@kobalte/core/popover"
 import { useNavigate } from "@solidjs/router"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { IconButton } from "@opencode-ai/ui/icon-button"
-import { createMemo, createResource, type ComponentProps, type JSX, type ValidComponent } from "solid-js"
+import { createMemo, createResource, For, type ComponentProps, type JSX, type ValidComponent } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "@/context/sdk"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { List } from "@opencode-ai/ui/list"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 
 type Skill = {
@@ -18,8 +19,9 @@ type Skill = {
 
 const SkillList = (props: {
   skills: () => Skill[]
+  selected: () => string[]
   class?: string
-  onSelect: (skill: Skill | undefined) => void
+  onToggle: (skill: Skill) => void
   searchAction?: JSX.Element
 }) => {
   const language = useLanguage()
@@ -37,13 +39,25 @@ const SkillList = (props: {
       items={props.skills}
       filterKeys={["name", "description"]}
       sortBy={(a, b) => a.name.localeCompare(b.name)}
-      onSelect={props.onSelect}
+      onSelect={(skill) => skill && props.onToggle(skill)}
     >
       {(skill) => (
         <Tooltip placement="right-start" value={skill.description} disabled={!skill.description}>
-          <div class="w-full flex flex-col min-w-0 text-left py-1">
-            <span class="text-13-medium text-text-strong">{skill.name}</span>
-            <span class="text-12-regular text-text-weak text-left truncate">{skill.description}</span>
+          <div class="w-full flex items-center gap-2 min-w-0 text-left py-1">
+            <div
+              class="shrink-0 size-4 rounded border border-border-base flex items-center justify-center transition-colors"
+              classList={{
+                "bg-interactive-base border-interactive-base": props.selected().includes(skill.name),
+              }}
+            >
+              {props.selected().includes(skill.name) && (
+                <Icon name="check-small" size="small" class="size-3 text-white" />
+              )}
+            </div>
+            <div class="flex flex-col min-w-0 flex-1">
+              <span class="text-13-medium text-text-strong">{skill.name}</span>
+              <span class="text-12-regular text-text-weak text-left truncate">{skill.description}</span>
+            </div>
           </div>
         </Tooltip>
       )}
@@ -57,7 +71,8 @@ export function SkillSelectorPopover(props: {
   children?: JSX.Element
   triggerAs?: ValidComponent
   triggerProps?: SkillSelectorTriggerProps
-  onSelect?: (skill: Skill | undefined) => void
+  selectedSkills: () => string[]
+  onToggle?: (skill: Skill) => void
 }) {
   const [store, setStore] = createStore<{
     open: boolean
@@ -134,6 +149,7 @@ export function SkillSelectorPopover(props: {
           <Kobalte.Title class="sr-only">{language.t("dialog.skill.select.title")}</Kobalte.Title>
           <SkillList
             skills={skills}
+            selected={props.selectedSkills}
             class="p-1"
             searchAction={
               sdk.directory ? (
@@ -149,10 +165,7 @@ export function SkillSelectorPopover(props: {
                 </Tooltip>
               ) : undefined
             }
-            onSelect={(skill) => {
-              props.onSelect?.(skill)
-              setStore("open", false)
-            }}
+            onToggle={(skill) => props.onToggle?.(skill)}
           />
         </Kobalte.Content>
       </Kobalte.Portal>

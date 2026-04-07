@@ -32,6 +32,7 @@ const ModelList: Component<{
     model
       .list()
       .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
+      .filter((m) => m.provider.id !== "opencode")
       .filter((m) => (props.provider ? m.provider.id === props.provider : true)),
   )
 

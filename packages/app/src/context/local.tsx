@@ -353,13 +353,18 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     const skill = (() => {
-      const [store, setStore] = createStore<{ current?: string }>({})
+      const [store, setStore] = createStore<{ current: string[] }>({ current: [] })
       return {
         current() {
           return store.current
         },
-        set(name: string | undefined) {
-          setStore("current", name)
+        set(names: string[]) {
+          setStore("current", names)
+        },
+        toggle(name: string) {
+          const existing = store.current
+          if (existing.includes(name)) setStore("current", existing.filter((x) => x !== name))
+          else setStore("current", [...existing, name])
         },
       }
     })()

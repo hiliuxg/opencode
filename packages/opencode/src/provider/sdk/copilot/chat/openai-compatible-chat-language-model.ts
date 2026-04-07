@@ -61,7 +61,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
   private readonly chunkSchema // type inferred via constructor
 
   constructor(modelId: OpenAICompatibleChatModelId, config: OpenAICompatibleChatConfig) {
-    console.log("[OpenAICompatibleChatLanguageModel] constructor called", { modelId, provider: config.provider })
     this.modelId = modelId
     this.config = config
 
@@ -304,7 +303,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
   }
 
   async doStream(options: LanguageModelV3CallOptions) {
-    console.log("[OpenAICompatibleChatLanguageModel] doStream called", { modelId: this.modelId, provider: this.provider })
     const { args, warnings } = await this.getArgs({ ...options })
 
     const body = {
@@ -458,7 +456,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
             if (choice?.finish_reason != null) {
               const hasTools = toolCalls.length > 0 || (delta?.tool_calls != null && delta.tool_calls.length > 0)
               const raw = hasTools && choice.finish_reason === "stop" ? "tool_calls" : choice.finish_reason
-              console.log("[OpenAICompatibleChatLanguageModel] finish_reason", { original: choice.finish_reason, corrected: raw, hasTools, toolCallsCount: toolCalls.length })
               finishReason = {
                 unified: mapOpenAICompatibleFinishReason(raw),
                 raw: raw ?? undefined,
