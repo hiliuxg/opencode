@@ -54,6 +54,8 @@ import { createAim } from "@/utils/aim"
 import { setNavigate } from "@/utils/notification-click"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 import { setSessionHandoff } from "@/pages/session/handoff"
+import { gitAccount } from "@/utils/git-account"
+import { setSkillUpdates, skillUpdateCount } from "@/utils/skill-updates"
 
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
@@ -554,7 +556,44 @@ export default function Layout(props: ParentProps) {
       })
     })
 
+  const useSkillUpdatePolling = () =>
+    onMount(() => {
+      let interval: ReturnType<typeof setInterval> | undefined
+
+      const poll = async (dir: string) => {
+        const account = gitAccount(dir)
+        if (!account) return
+        try {
+          const res = await fetch(
+            `${globalSDK.url}/skill/check-updates?directory=${encodeURIComponent(dir)}&name=${encodeURIComponent(account)}`,
+          )
+          if (!res.ok) return
+          const data = (await res.json()) as { updates: Record<string, { behind: number; branch: string }> }
+          setSkillUpdates(data.updates ?? {})
+        } catch {
+          // silently ignore network errors
+        }
+      }
+
+      const start = (dir: string) => {
+        if (interval !== undefined) clearInterval(interval)
+        void poll(dir)
+        interval = setInterval(() => void poll(dir), 10 * 60 * 1000)
+      }
+
+      createEffect(() => {
+        const dir = currentDir()
+        if (!dir) return
+        start(dir)
+      })
+
+      onCleanup(() => {
+        if (interval !== undefined) clearInterval(interval)
+      })
+    })
+
   useUpdatePolling()
+  useSkillUpdatePolling()
   useSDKNotificationToasts()
 
   function scrollToSession(sessionId: string, sessionKey: string) {
@@ -2422,6 +2461,7 @@ export default function Layout(props: ParentProps) {
       schedulerLabel={() => language.t("sidebar.scheduler")}
       onOpenScheduler={openScheduler}
       skillsLabel={() => language.t("sidebar.skills")}
+      skillsUpdatesLabel={() => language.t("skills.updates.tooltip", { count: skillUpdateCount() })}
       onOpenSkills={openSkills}
       apiDocLabel={() => language.t("sidebar.apiDoc")}
       onOpenApiDoc={openApiDoc}

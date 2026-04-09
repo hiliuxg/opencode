@@ -11,6 +11,8 @@ import { showToast } from "@opencode-ai/ui/toast"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
+import { skillUpdates, setSkillUpdates } from "@/utils/skill-updates"
+import { gitAccount } from "@/utils/git-account"
 
 /** 创建技能表单：业务领域「其他」选项的内部值（prompt 中替换为 i18n 文案） */
 const KB_CATALOG_OTHER = "__kb_catalog_other__"
@@ -22,12 +24,8 @@ export default function SkillsPage() {
     const navigate = useNavigate()
     const currentDir = () => decode64(params.dir)
 
-    /** pull / push / clone 共用：从工作区路径解析 Git/技能同步账号 */
-    const accountFromWorkspaceDir = (dir: string): string | null => {
-        if (dir.startsWith("/home/")) return dir.split("/")[2] || null
-        if (dir.startsWith("/Users/leoliu/myroom/")) return "xiaogenliu"
-        return null
-    }
+    const [isUpdatingAll, setIsUpdatingAll] = createSignal(false)
+    const [isCheckingUpdates, setIsCheckingUpdates] = createSignal(false)
 
     const [uploadModalOpen, setUploadModalOpen] = createSignal(false)
     const [selectedSkill, setSelectedSkill] = createSignal<any>(null)
@@ -178,7 +176,7 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        const account = accountFromWorkspaceDir(dir) ?? ""
+        const account = gitAccount(dir) ?? ""
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
@@ -284,7 +282,7 @@ export default function SkillsPage() {
 
         const catalogLabel =
             kbCatalog() === KB_CATALOG_OTHER ? language.t("skills.kb.form.catalog.other") : kbCatalog()
-        const account = accountFromWorkspaceDir(dir) ?? language.t("skills.kb.form.account.unknown")
+        const account = gitAccount(dir) ?? language.t("skills.kb.form.account.unknown")
         const promptString = language.t("skills.kb.creator.prompt", {
             account,
             engine: kbEngine(),
@@ -306,7 +304,7 @@ export default function SkillsPage() {
         const dir = currentDir()
         if (!dir) return
 
-        const account = accountFromWorkspaceDir(dir) ?? ""
+        const account = gitAccount(dir) ?? ""
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
@@ -326,6 +324,11 @@ export default function SkillsPage() {
                 const text = await res.text().catch(() => res.statusText)
                 throw new Error(text)
             }
+            // Remove this skill from update list
+            const updates = skillUpdates()
+            const { [skill.name]: _, ...rest } = updates
+            setSkillUpdates(rest)
+
             await handleRefresh()
             showToast({ title: language.t("skills.pull.success.title"), description: language.t("skills.pull.success.description", { name: skill.name }) })
         } catch (err: any) {
@@ -334,6 +337,86 @@ export default function SkillsPage() {
         } finally {
             setIsPullingSkill(null)
         }
+    }
+
+    const pullSkillSilent = async (dir: string, account: string, skill: any) => {
+        const skillDir = skill.location.split("/").slice(0, -1).join("/")
+        setIsPullingSkill(skill.name)
+        try {
+            const res = await fetch(`${globalSDK.url}/skill/pull?directory=${encodeURIComponent(dir)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ directory: dir, name: account, skillDir }),
+            })
+            if (!res.ok) {
+                const text = await res.text().catch(() => res.statusText)
+                throw new Error(text)
+            }
+        } catch (err: any) {
+            showToast({ title: language.t("skills.pull.failed.title"), description: `${skill.name}: ${err.message}`, variant: "error" })
+        } finally {
+            setIsPullingSkill(null)
+        }
+    }
+
+    const handleCheckUpdates = async () => {
+        const dir = currentDir()
+        if (!dir) return
+        const account = gitAccount(dir) ?? ""
+        if (!account) {
+            showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
+            return
+        }
+        setIsCheckingUpdates(true)
+        try {
+            const res = await fetch(
+                `${globalSDK.url}/skill/check-updates?directory=${encodeURIComponent(dir)}&name=${encodeURIComponent(account)}`,
+            )
+            if (!res.ok) {
+                const text = await res.text().catch(() => res.statusText)
+                throw new Error(text)
+            }
+            const data = (await res.json()) as { updates: Record<string, { behind: number; branch: string }> }
+            setSkillUpdates(data.updates ?? {})
+            const count = Object.keys(data.updates ?? {}).length
+            await handleRefresh()
+            showToast({
+                title: language.t("skills.updates.check.done.title"),
+                description: count > 0
+                    ? language.t("skills.updates.banner", { count })
+                    : language.t("skills.updates.check.upToDate"),
+            })
+        } catch (err: any) {
+            showToast({ title: language.t("skills.pull.failed.title"), description: err.message, variant: "error" })
+        } finally {
+            setIsCheckingUpdates(false)
+        }
+    }
+
+    const handleUpdateAll = async () => {
+        const dir = currentDir()
+        if (!dir) return
+        const account = gitAccount(dir) ?? ""
+        if (!account) {
+            showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
+            return
+        }
+        const updates = skillUpdates()
+        const names = Object.keys(updates)
+        if (names.length === 0) return
+        if (!confirm(language.t("skills.updates.updateAll.confirm", { count: names.length }))) return
+
+        setIsUpdatingAll(true)
+        const allSkills = skills() ?? []
+        for (const name of names) {
+            const skill = allSkills.find((s: any) => s.name === name)
+            if (!skill) continue
+            await pullSkillSilent(dir, account, skill)
+        }
+        setSkillUpdates({})
+        await handleRefresh()
+        showToast({ title: language.t("skills.pull.success.title"), description: language.t("skills.updates.updateAll.done", { count: names.length }) })
+        setIsUpdatingAll(false)
     }
 
     const marketFiltered = createMemo(() => {
@@ -401,7 +484,7 @@ export default function SkillsPage() {
         if (ids.length === 0) return
         const dir = currentDir()
         if (!dir) return
-        const account = accountFromWorkspaceDir(dir)
+        const account = gitAccount(dir)
         if (!account) {
             showToast({ title: language.t("common.error.title"), description: language.t("common.error.noAccount"), variant: "error" })
             return
@@ -455,24 +538,39 @@ export default function SkillsPage() {
                     >
                         {language.t("skills.market.web")}
                     </Button>
-                    <Button
-                        variant="secondary"
-                        onClick={handleRefresh}
-                    >
-                        <div class="flex items-center gap-2">
-                            {language.t("skills.refresh")}
-                        </div>
-                    </Button>
                     <Button variant="secondary" onClick={openSkillMarket}>
                         {language.t("skills.gitClone.button")}
                     </Button>
-                    <Button variant="primary" onClick={() => setKbModalOpen(true)}>
+                    <Button variant="secondary" onClick={() => setKbModalOpen(true)}>
                         {language.t("skills.kb.create")}
+                    </Button>
+                    <Button 
+                        variant="primary"
+                        disabled={isCheckingUpdates()}
+                        onClick={handleCheckUpdates}
+                    >
+                        {isCheckingUpdates() ? language.t("skills.updates.checking") : language.t("skills.updates.check")}
                     </Button>
                 </div>
             </div>
 
             <div class="flex-1 overflow-y-auto p-6">
+                <Show when={Object.keys(skillUpdates()).length > 0}>
+                    <div class="flex items-center justify-between gap-4 mb-5 px-4 py-3 rounded-lg border border-border-weak-base bg-surface-raised-base">
+                        <div class="flex items-center gap-2 text-14-regular text-text-base">
+                            <Icon name="download" class="size-4 text-interactive-base shrink-0" />
+                            <span>{language.t("skills.updates.banner", { count: Object.keys(skillUpdates()).length })}</span>
+                        </div>
+                        <Button
+                            size="small"
+                            variant="secondary"
+                            disabled={isUpdatingAll()}
+                            onClick={handleUpdateAll}
+                        >
+                            {isUpdatingAll() ? language.t("skills.updates.updating") : language.t("skills.updates.updateAll", { count: Object.keys(skillUpdates()).length })}
+                        </Button>
+                    </div>
+                </Show>
                 <Suspense fallback={<div class="flex justify-center p-8">{language.t("common.loading")}</div>}>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <For each={skills()}>
@@ -490,7 +588,11 @@ export default function SkillsPage() {
                                                             icon="download"
                                                             variant="ghost"
                                                             size="small"
-                                                            class="text-text-weak hover:text-text-strong transition-colors"
+                                                            classList={{
+                                                                "transition-colors": true,
+                                                                "text-interactive-base hover:text-interactive-hover": !!skillUpdates()[skill.name],
+                                                                "text-text-weak hover:text-text-strong": !skillUpdates()[skill.name],
+                                                            }}
                                                             disabled={isPullingSkill() === skill.name}
                                                             onClick={(e) => handlePullSkill(e, skill)}
                                                         />
@@ -528,6 +630,14 @@ export default function SkillsPage() {
                                         <div class="text-14-regular text-text-base line-clamp-2">
                                             {skill.description}
                                         </div>
+                                        <Show when={skillUpdates()[skill.name]}>
+                                            {(info) => (
+                                                <span class="flex w-full flex-row justify-end items-center gap-1 text-12-regular text-interactive-base">
+                                                    <Icon name="branch" class="size-3 shrink-0" />
+                                                    {language.t("skills.updates.behind", { behind: info().behind, branch: info().branch })}
+                                                </span>
+                                            )}
+                                        </Show>
                                     </div>
                                 )}
                             </For>
@@ -538,7 +648,7 @@ export default function SkillsPage() {
                                 </div>
                             </Show>
                         </div>
-                    </Suspense>
+                </Suspense>
             </div>
 
             {/* Upload Modal */}

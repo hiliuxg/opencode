@@ -8,16 +8,17 @@ import { useLanguage } from "@/context/language"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { decode64 } from "@/utils/base64"
 
-const PROVIDER_ID = "tme-continue-provider"
+const PROVIDER_ID = "tme-conv1-provider"
+const PROVIDER_ID2 = "tme-conv2-provider"
 const MODEL_NAME = "GPT-5.4"
 
 const DEFAULT_CONFIG_TEMPLATE = `{
     "$schema": "https://opencode.ai/config.json",
-    "model": "tme-continue-provider/GPT-5.4",
+    "model": "tme-conv1-provider/GPT-5.4",
     "provider": {
-        "tme-continue-provider": {
+        "tme-conv1-provider": {
             "npm": "@ai-sdk/github-copilot",
-            "name": "tme-continue",
+            "name": "tme-conv1",
             "options": {
                 "baseURL": "https://continue.tmeoa.com/open/xcode/v1",
                 "apiKey": "{{TOKEN}}"
@@ -52,11 +53,31 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                         ]
                     }
                 },
-                "DeepSeek-V3.2": {
-                    "name": "DeepSeek-V3.2"
+                "GPT-5-mini": {
+                    "name": "GPT-5-mini",
+                    "modalities": {
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
+                    }
                 },
-                "GLM-5": {
-                    "name": "GLM-5"
+                "GPT-5.1": {
+                    "name": "GPT-5.1",
+                    "modalities": {
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
+                    }
                 },
                 "GPT-5.2": {
                     "name": "GPT-5.2",
@@ -110,6 +131,34 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                         ]
                     }
                 },
+                "TME DeepSeek-V3.1-Terminus": {
+                    "name": "TME DeepSeek-V3.1-Terminus"
+                },
+                "TME DeepSeek-V3.2": {
+                    "name": "TME DeepSeek-V3.2"
+                }
+            }
+        },
+        "tme-conv2-provider": {
+            "npm": "@ai-sdk/openai-compatible",
+            "name": "tme-conv2",
+            "options": {
+                "baseURL": "https://continue.tmeoa.com/open/xcode/v1",
+                "apiKey": "{{TOKEN}}"
+            },
+            "models": {
+                "DeepSeek-V3.2": {
+                    "name": "DeepSeek-V3.2"
+                },
+                "GLM-4.7": {
+                    "name": "GLM-4.7"
+                },
+                "GLM-5.1": {
+                    "name": "GLM-5.1"
+                },
+                "GLM-5": {
+                    "name": "GLM-5"
+                },
                 "Kimi-K2.5": {
                     "name": "Kimi-K2.5",
                     "modalities": {
@@ -122,38 +171,6 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                             "text"
                         ]
                     }
-                },
-                "GPT-5.4-mini": {
-                    "name": "GPT-5.4-mini",
-                    "modalities": {
-                        "input": [
-                            "text",
-                            "image",
-                            "pdf"
-                        ],
-                        "output": [
-                            "text"
-                        ]
-                    }
-                },
-                "GPT-5.4-nano": {
-                    "name": "GPT-5.4-nano",
-                    "modalities": {
-                        "input": [
-                            "text",
-                            "image",
-                            "pdf"
-                        ],
-                        "output": [
-                            "text"
-                        ]
-                    }
-                },
-                "TME DeepSeek-V3.1-Terminus": {
-                    "name": "TME DeepSeek-V3.1-Terminus"
-                },
-                "TME DeepSeek-V3.2": {
-                    "name": "TME DeepSeek-V3.2"
                 }
             }
         }
@@ -269,6 +286,14 @@ export const SettingsTokenManagement = () => {
                 config.provider[PROVIDER_ID].options = {}
               }
               config.provider[PROVIDER_ID].options.apiKey = token
+
+              // Also update tme-conv2-provider apiKey if it exists
+              if (config.provider[PROVIDER_ID2]) {
+                if (!config.provider[PROVIDER_ID2].options) {
+                  config.provider[PROVIDER_ID2].options = {}
+                }
+                config.provider[PROVIDER_ID2].options.apiKey = token
+              }
 
               // Also update model if not set
               if (!config.model || !config.model.includes(PROVIDER_ID)) {

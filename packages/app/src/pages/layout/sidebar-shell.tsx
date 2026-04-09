@@ -1,4 +1,5 @@
 import { createEffect, createMemo, For, Show, type Accessor, type JSX } from "solid-js"
+import { hasSkillUpdates, skillUpdateCount } from "@/utils/skill-updates"
 import {
   DragDropProvider,
   DragDropSensors,
@@ -9,6 +10,7 @@ import {
 } from "@thisbeyond/solid-dnd"
 import { ConstrainDragXAxis } from "@/utils/solid-dnd"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Icon } from "@opencode-ai/ui/icon"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { type LocalProject } from "@/context/layout"
 
@@ -28,6 +30,7 @@ export const SidebarContent = (props: {
   schedulerLabel: Accessor<string>
   onOpenScheduler: () => void
   skillsLabel: Accessor<string>
+  skillsUpdatesLabel: Accessor<string>
   onOpenSkills: () => void
   apiDocLabel: Accessor<string>
   onOpenApiDoc: () => void
@@ -109,14 +112,29 @@ export const SidebarContent = (props: {
               aria-label={props.schedulerLabel()}
             />
           </Tooltip>
-          <Tooltip placement={placement()} value={props.skillsLabel()}>
-            <IconButton
-              icon="knowledge-base"
-              variant="ghost"
-              size="large"
-              onClick={props.onOpenSkills}
-              aria-label={props.skillsLabel()}
-            />
+          <Tooltip
+            placement={placement()}
+            value={
+              <div class="flex flex-col gap-1">
+                <span>{props.skillsLabel()}</span>
+                <Show when={hasSkillUpdates()}>
+                  <span class="text-12-regular text-negative-base">{props.skillsUpdatesLabel()}</span>
+                </Show>
+              </div>
+            }
+          >
+            <div class="relative">
+              <IconButton
+                icon="knowledge-base"
+                variant="ghost"
+                size="large"
+                onClick={props.onOpenSkills}
+                aria-label={props.skillsLabel()}
+              />
+              <Show when={hasSkillUpdates()}>
+                <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-icon-critical-base pointer-events-none animate-pulse" />
+              </Show>
+            </div>
           </Tooltip>
           <Tooltip placement={placement()} value={props.apiDocLabel()}>
             <IconButton

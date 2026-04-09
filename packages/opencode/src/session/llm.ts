@@ -130,10 +130,10 @@ export namespace LLM {
     const base = input.small
       ? ProviderTransform.smallOptions(input.model)
       : ProviderTransform.options({
-        model: input.model,
-        sessionID: input.sessionID,
-        providerOptions: provider.options,
-      })
+          model: input.model,
+          sessionID: input.sessionID,
+          providerOptions: provider.options,
+        })
     const options: Record<string, any> = pipe(
       base,
       mergeDeep(input.model.options),
@@ -192,15 +192,12 @@ export namespace LLM {
       },
     )
 
-    const maxOutputTokens =
-      isOpenaiOauth || provider.id.includes("github-copilot")
-        ? undefined
-        : ProviderTransform.maxOutputTokens(input.model)
-
+    const maxOutputTokens = ProviderTransform.maxOutputTokens(input.model)
     l.info("maxOutputTokens resolved", {
       maxOutputTokens,
       modelLimitOutput: input.model.limit?.output,
       globalMax: ProviderTransform.OUTPUT_TOKEN_MAX,
+      providerID: input.model.providerID,
     })
 
     const tools = await resolveTools(input)
@@ -306,11 +303,9 @@ export namespace LLM {
               "x-opencode-request": input.user.id,
               "x-opencode-client": Flag.OPENCODE_CLIENT,
             }
-          : input.model.providerID !== "anthropic"
-            ? {
-                "User-Agent": `opencode/${Installation.VERSION}`,
-              }
-            : undefined),
+          : {
+              "User-Agent": `opencode/${Installation.VERSION}`,
+            }),
         ...input.model.headers,
         ...headers,
       },

@@ -2,8 +2,10 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { createStore, produce } from "solid-js/store"
 import { A, useSearchParams } from "@solidjs/router"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import type { AssistantMessage, GlobalSession } from "@opencode-ai/sdk/v2/client"
 import { base64Encode } from "@opencode-ai/util/encode"
+import { Button } from "@opencode-ai/ui/button"
 
 // ECharts imports (tree-shaking friendly)
 import * as echarts from "echarts/core"
@@ -21,7 +23,7 @@ echarts.use([LineChart, BarChart, GridComponent, TooltipComponent, LegendCompone
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DayStats = { tokens: number; questions: number; sessions: number }
+type DayStats = { tokens: number; questions: number; sessions: number; dirs: Record<string, true> }
 type DirStats = { sessions: number; questions: number; tokens: number }
 type SessionStat = { id: string; title: string; directory: string; tokens: number; questions: number }
 
@@ -152,6 +154,91 @@ function ChartSection(props: { title: string; sub: string; children: unknown }) 
   )
 }
 
+// ─── Chart With Table Tabs ────────────────────────────────────────────────────
+
+type ViewMode = "chart" | "table"
+
+function ChartWithTable(props: {
+  option: echarts.EChartsCoreOption
+  class?: string
+  columns: { key: string; title: string; align?: "left" | "right"; formatter?: (v: number) => string }[]
+  data: () => Record<string, number | string>[]
+}) {
+  const language = useLanguage()
+  const [mode, setMode] = createSignal<ViewMode>("chart")
+
+  return (
+    <div class="flex flex-col gap-3">
+      <div class="flex gap-1">
+        <Button
+          size="small"
+          variant={mode() === "chart" ? "primary" : "secondary"}
+          onClick={() => setMode("chart")}
+        >
+          {language.t("common.chart")}
+        </Button>
+        <Button
+          size="small"
+          variant={mode() === "table" ? "primary" : "secondary"}
+          onClick={() => setMode("table")}
+        >
+          {language.t("common.table")}
+        </Button>
+      </div>
+      <Show when={mode() === "chart"}>
+        <EChart option={props.option} class={props.class} />
+      </Show>
+      <Show when={mode() === "table"}>
+        <div class="overflow-x-auto" style={{ "max-height": "240px" }}>
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-surface-base">
+              <tr class="border-b border-border-weak-base">
+                <For each={props.columns}>
+                  {(col) => (
+                    <th
+                      class="py-2 px-2 text-xs font-medium text-text-weak"
+                      classList={{ "text-left": col.align !== "right", "text-right": col.align === "right" }}
+                    >
+                      {col.title}
+                    </th>
+                  )}
+                </For>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={props.data()}>
+                {(row) => (
+                  <tr class="border-b border-border-weak-base/50 hover:bg-surface-hover-base">
+                    <For each={props.columns}>
+                      {(col) => {
+                        const val = row[col.key]
+                        const display = col.formatter && typeof val === "number" ? col.formatter(val) : String(val)
+                        return (
+                          <td
+                            class="py-2 px-2 tabular-nums"
+                            classList={{
+                              "text-left": col.align !== "right",
+                              "text-right": col.align === "right",
+                              "text-text-strong": col.key !== "date",
+                              "text-text-weak": col.key === "date",
+                            }}
+                          >
+                            {display}
+                          </td>
+                        )
+                      }}
+                    </For>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
 // ─── Quick Range Button ───────────────────────────────────────────────────────
 
 function QuickBtn(props: { label: string; active: boolean; onClick: () => void }) {
@@ -173,6 +260,7 @@ function QuickBtn(props: { label: string; active: boolean; onClick: () => void }
 
 export default function Dashboard() {
   const globalSDK = useGlobalSDK()
+  const language = useLanguage()
 
   const [from, setFrom] = createSignal(defaultFrom())
   const [to, setTo] = createSignal(defaultTo())
@@ -207,7 +295,7 @@ export default function Dashboard() {
 
       const result = await globalSDK.client.experimental.session.list({
         start: range.from,
-        limit: 2000,
+        limit: 3000,
         archived: true,
         directory: range.dir,
       })
@@ -226,7 +314,7 @@ export default function Dashboard() {
             const r = await globalSDK.client.session.messages({
               sessionID: session.id,
               directory: session.directory,
-              limit: 2000,
+              limit: 3000,
             })
             if (myVer !== ver) return
 
@@ -244,7 +332,7 @@ export default function Dashboard() {
                 sQuestions++
                 setStats(
                   produce((s) => {
-                    if (!s.byDay[day]) s.byDay[day] = { tokens: 0, questions: 0, sessions: 0 }
+                    if (!s.byDay[day]) s.byDay[day] = { tokens: 0, questions: 0, sessions: 0, dirs: {} }
                     s.byDay[day].questions++
                   }),
                 )
@@ -256,7 +344,7 @@ export default function Dashboard() {
                   const key: ProviderModelKey = `${assistantMsg.providerID}/${assistantMsg.modelID}`
                   setStats(
                     produce((s) => {
-                      if (!s.byDay[day]) s.byDay[day] = { tokens: 0, questions: 0, sessions: 0 }
+                      if (!s.byDay[day]) s.byDay[day] = { tokens: 0, questions: 0, sessions: 0, dirs: {} }
                       s.byDay[day].tokens += t
                       if (!s.byProviderModel[key]) s.byProviderModel[key] = { tokens: 0, count: 0 }
                       s.byProviderModel[key].tokens += t
@@ -271,8 +359,9 @@ export default function Dashboard() {
             const dir = session.directory
             setStats(
               produce((s) => {
-                if (!s.byDay[sDay]) s.byDay[sDay] = { tokens: 0, questions: 0, sessions: 0 }
+                if (!s.byDay[sDay]) s.byDay[sDay] = { tokens: 0, questions: 0, sessions: 0, dirs: {} }
                 s.byDay[sDay].sessions++
+                s.byDay[sDay].dirs[dir] = true
                 if (!s.byDir[dir]) s.byDir[dir] = { sessions: 0, questions: 0, tokens: 0 }
                 s.byDir[dir].sessions++
                 s.byDir[dir].questions += sQuestions
@@ -317,14 +406,20 @@ export default function Dashboard() {
   const topSessions = createMemo(() =>
     Object.values(stats.bySession)
       .sort((a, b) => b.tokens - a.tokens)
-      .slice(0, 10),
+      .slice(0, 20),
   )
 
   const topDirs = createMemo(() =>
     Object.entries(stats.byDir)
       .map(([dir, stats]) => ({ dir, ...stats }))
       .sort((a, b) => b.tokens - a.tokens)
-      .slice(0, 10),
+      .slice(0, 20),
+  )
+
+  const allDirs = createMemo(() =>
+    Object.entries(stats.byDir)
+      .map(([dir, stats]) => ({ dir, ...stats }))
+      .sort((a, b) => b.tokens - a.tokens),
   )
 
   const topProviderModels = createMemo(() =>
@@ -334,7 +429,19 @@ export default function Dashboard() {
         return { key, providerID, modelID, ...stats }
       })
       .sort((a, b) => b.tokens - a.tokens)
-      .slice(0, 15),
+      .slice(0, 20),
+  )
+
+  // Daily active directory count
+  const dailyDirCounts = createMemo(() => days().map((d) => Object.keys(stats.byDay[d]?.dirs ?? {}).length))
+
+  // Daily directory detail rows (date asc)
+  const dailyDirRows = createMemo(() =>
+    [...days()]
+      .sort()
+      .flatMap((d) =>
+        Object.keys(stats.byDay[d]?.dirs ?? {}).map((dir) => ({ date: d, dir })),
+      ),
   )
 
   // ── ECharts Options ────────────────────────────────────────────────────────
@@ -611,6 +718,53 @@ export default function Dashboard() {
     }
   })
 
+  // Daily active directory count line chart
+  const dailyDirChartOption = createMemo<echarts.EChartsCoreOption>(() => ({
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(255,255,255,0.95)",
+      borderColor: "#e5e7eb",
+      textStyle: { color: "#374151", fontSize: 12 },
+      formatter: (params: any) => {
+        const p = params?.[0]
+        if (!p) return ""
+        return `${p.name}<br/><span style="color:${CHART_COLORS[4]}">●</span> 活跃目录数: ${p.value}`
+      },
+    },
+    grid: { left: 60, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: "category",
+      data: days(),
+      axisLine: { lineStyle: { color: "#d1d5db" } },
+      axisLabel: { color: "#6b7280", fontSize: 10, formatter: (v: string) => v.slice(5) },
+    },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: "#f3f4f6" } },
+      axisLabel: { color: "#9ca3af", fontSize: 10 },
+    },
+    series: [
+      {
+        type: "line",
+        data: dailyDirCounts(),
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 6,
+        lineStyle: { color: CHART_COLORS[4], width: 2 },
+        itemStyle: { color: CHART_COLORS[4] },
+        areaStyle: {
+          color: new (echarts as any).graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(236, 72, 153, 0.3)" },
+            { offset: 1, color: "rgba(236, 72, 153, 0.05)" },
+          ]),
+        },
+      },
+    ],
+  }))
+
   const totalDirs = createMemo(() => Object.keys(stats.byDir).length)
   const totalSessions = createMemo(() =>
     Object.values(stats.byDir).reduce((sum, d) => sum + d.sessions, 0),
@@ -741,12 +895,58 @@ export default function Dashboard() {
 
         {/* ── Daily Token Chart ── */}
         <ChartSection title="每日 Token 消耗" sub="每天消耗的模型 token 总量（input + output + reasoning）">
-          <EChart option={tokenChartOption()} />
+          <ChartWithTable
+            option={tokenChartOption()}
+            columns={[
+              { key: "date", title: language.t("common.date"), align: "left" },
+              { key: "tokens", title: "Tokens", align: "right", formatter: formatNum },
+            ]}
+            data={() =>
+              days().map((d, i) => ({
+                date: d,
+                tokens: dailyTokens()[i] ?? 0,
+              }))
+            }
+          />
         </ChartSection>
 
         {/* ── Daily Questions & Sessions Chart ── */}
         <ChartSection title="每日问题数与会话数" sub="每天用户发送的消息数（role=user）以及活跃会话数">
-          <EChart option={dailyChartOption()} />
+          <ChartWithTable
+            option={dailyChartOption()}
+            columns={[
+              { key: "date", title: language.t("common.date"), align: "left" },
+              { key: "questions", title: "问题数", align: "right", formatter: formatNum },
+              { key: "sessions", title: "会话数", align: "right", formatter: formatNum },
+            ]}
+            data={() =>
+              days().map((d, i) => ({
+                date: d,
+                questions: dailyQuestions()[i] ?? 0,
+                sessions: dailySessions()[i] ?? 0,
+              }))
+            }
+          />
+        </ChartSection>
+
+        {/* ── Daily Active Directory Count Chart ── */}
+        <ChartSection
+          title={language.t("dashboard.dailyDirs.title")}
+          sub={language.t("dashboard.dailyDirs.sub")}
+        >
+          <ChartWithTable
+            option={dailyDirChartOption()}
+            columns={[
+              { key: "date", title: language.t("common.date"), align: "left" },
+              { key: "dirs", title: "活跃目录数", align: "right" },
+            ]}
+            data={() =>
+              days().map((d, i) => ({
+                date: d,
+                dirs: dailyDirCounts()[i] ?? 0,
+              }))
+            }
+          />
         </ChartSection>
 
         {/* ── Per-Directory Bar Charts ── */}
@@ -767,17 +967,17 @@ export default function Dashboard() {
         <Show when={topProviderModels().length > 0}>
           <ChartSection
             title="Provider / Model Token 消耗"
-            sub="各模型提供商的 Token 消耗排行（Top 15）"
+            sub="各模型提供商的 Token 消耗排行（Top 20）"
           >
             <EChart option={providerModelChartOption()} />
           </ChartSection>
         </Show>
 
-        {/* ── Top 10 Tables (Side by Side) ── */}
+        {/* ── Top 20Tables (Side by Side) ── */}
         <Show when={topSessions().length > 0 || topDirs().length > 0}>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top 10 Sessions */}
-            <ChartSection title="Top 10 会话" sub="Token 消耗最多的会话">
+            {/* Top 20Sessions */}
+            <ChartSection title="Top 20会话" sub="Token 消耗最多的会话">
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
@@ -826,8 +1026,8 @@ export default function Dashboard() {
               </div>
             </ChartSection>
 
-            {/* Top 10 Directories */}
-            <ChartSection title="Top 10 目录" sub="Token 消耗最多的工作目录">
+            {/* Top 20Directories */}
+            <ChartSection title="Top 20目录" sub="Token 消耗最多的工作目录">
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
@@ -865,7 +1065,84 @@ export default function Dashboard() {
                 </table>
               </div>
             </ChartSection>
+
+            {/* All Directories */}
+            <ChartSection title={language.t("dashboard.allDirs.title")} sub={language.t("dashboard.allDirs.sub")}>
+              <div class="overflow-x-auto max-h-[600px]">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0 bg-surface-base z-10">
+                    <tr class="border-b border-border-weak-base">
+                      <th class="text-left py-2 px-2 text-xs font-medium text-text-weak">排名</th>
+                      <th class="text-left py-2 px-2 text-xs font-medium text-text-weak">目录</th>
+                      <th class="text-right py-2 px-2 text-xs font-medium text-text-weak">会话数</th>
+                      <th class="text-right py-2 px-2 text-xs font-medium text-text-weak">问题数</th>
+                      <th class="text-right py-2 px-2 text-xs font-medium text-text-weak">Token</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={allDirs()}>
+                      {(dir, index) => (
+                        <tr class="border-b border-border-weak-base/50 hover:bg-surface-hover-base">
+                          <td class="py-2 px-2 text-text-faint tabular-nums">{index() + 1}</td>
+                          <td class="py-2 px-2 text-text-strong truncate max-w-[200px]" title={dir.dir}>
+                            <A
+                              href={`/${base64Encode(dir.dir)}`}
+                              class="hover:underline"
+                              target="_blank"
+                            >
+                              {shortDir(dir.dir)}
+                            </A>
+                          </td>
+                          <td class="py-2 px-2 text-right text-text-weak tabular-nums">{dir.sessions}</td>
+                          <td class="py-2 px-2 text-right text-text-weak tabular-nums">{dir.questions}</td>
+                          <td class="py-2 px-2 text-right text-text-strong tabular-nums font-medium">
+                            {formatNum(dir.tokens)}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </ChartSection>
           </div>
+
+          {/* ── Daily Directory Detail Table ── */}
+          <Show when={dailyDirRows().length > 0}>
+            <ChartSection
+              title={language.t("dashboard.dailyDirDetail.title")}
+              sub={language.t("dashboard.dailyDirDetail.sub")}
+            >
+              <div class="overflow-x-auto max-h-[600px]">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0 bg-surface-base z-10">
+                    <tr class="border-b border-border-weak-base">
+                      <th class="text-left py-2 px-2 text-xs font-medium text-text-weak">{language.t("common.date")}</th>
+                      <th class="text-left py-2 px-2 text-xs font-medium text-text-weak">目录</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={dailyDirRows()}>
+                      {(row) => (
+                        <tr class="border-b border-border-weak-base/50 hover:bg-surface-hover-base">
+                          <td class="py-2 px-2 text-text-weak tabular-nums whitespace-nowrap">{row.date}</td>
+                          <td class="py-2 px-2 text-text-strong truncate max-w-[400px]" title={row.dir}>
+                            <A
+                              href={`/${base64Encode(row.dir)}`}
+                              class="hover:underline"
+                              target="_blank"
+                            >
+                              {shortDir(row.dir)}
+                            </A>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </ChartSection>
+          </Show>
         </Show>
 
         {/* ── Empty state ── */}

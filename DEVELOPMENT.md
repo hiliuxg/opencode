@@ -216,6 +216,7 @@ opencode-app-2251:latest
 # 上一个版本 opencode-v125-03252302
 # 上一个版本 opencode-v125-03262334 
 # 上一个版本 opencode-v125-03282001 45f94d09e8a3
+# 上一个版本 45f94d09e8a3   opencode-v125-03282001 
 
 # 前端构建
 
@@ -241,7 +242,8 @@ sudo docker load -i opencode-v1313-04052340.tar
   
   
 sudo docker run  -d \
-  -p 4097:4096 \
+  -p 4096:4096 \
+  -e OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=10240 \
   -e OPENCODE_ACCESS_GRANTS=/root/.config/opencode/grants.json \
   -e OPENCODE_BASE_PATH=/kgbi/starbot \
   -e OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB \
@@ -255,8 +257,7 @@ sudo docker run  -d \
   opencode-v1313-04052340 \
   --print-logs serve --hostname 0.0.0.0 --cors * --log-level DEBUG  
 
-/home/xiaogenliu/ccc.json
-/home/xiaogenliu/ccc.json
+
 
 docker exec -it 3f38319046be  /bin/sh
 

@@ -41,6 +41,7 @@ import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
 import { createHash, createDecipheriv } from "node:crypto"
+import path from "node:path"
 import { base64Decode, base64Encode } from "@opencode-ai/util/encode"
 import "./projectors"
 
@@ -330,7 +331,7 @@ export namespace Server {
             },
           })
         })
-        .use(validator("query", z.object({ directory: z.string().optional() })))
+        .use(validator("query", z.object({ directory: z.string().optional(), name: z.string().optional() })))
         .route("/project", ProjectRoutes())
         .route("/pty", PtyRoutes())
         .route("/config", ConfigRoutes())
@@ -659,6 +660,112 @@ export namespace Server {
             if (proc.exitCode !== 0) throw new NamedError.Unknown({ message: "git clone failed" })
 
             return c.json({ ok: true })
+          },
+        )
+        .get(
+          "/skill/check-updates",
+          describeRoute({
+            summary: "Check for skill updates",
+            description: "For each skill that is a git repository, fetch from remote and report how many commits behind the local branch is.",
+            operationId: "skill.checkUpdates",
+            responses: {
+              200: {
+                description: "Update check result",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        updates: z.record(z.string(), z.object({ behind: z.number(), branch: z.string() })),
+                      }),
+                    ),
+                  },
+                },
+              },
+            },
+          }),
+          async (c) => {
+            const name = c.req.query("name") ?? ""
+            log.info("[skill/check-updates] starting", { name })
+
+            const skills = await Skill.all()
+            log.info("[skill/check-updates] loaded skills", { count: skills.length })
+
+            const repoToSkills = new Map<string, string[]>()
+            for (const skill of skills) {
+              const skillDir = path.dirname(skill.location)
+              const toplevel = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], { cwd: skillDir })
+              if (toplevel.exitCode !== 0) continue
+              const repoDir = new TextDecoder().decode(toplevel.stdout).trim()
+              if (!repoDir) continue
+              const existing = repoToSkills.get(repoDir) ?? []
+              existing.push(skill.name)
+              repoToSkills.set(repoDir, existing)
+            }
+
+            log.info("[skill/check-updates] deduped repos", { count: repoToSkills.size })
+
+            const updates: Record<string, { behind: number; branch: string }> = {}
+
+            for (const [repoDir, skillNames] of repoToSkills) {
+              try {
+                const remoteProc = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: repoDir })
+                const remoteUrl = new TextDecoder().decode(remoteProc.stdout).trim()
+                if (!remoteUrl) continue
+
+                const needAuth =
+                  Boolean(name) &&
+                  (remoteUrl.startsWith("http://") || remoteUrl.startsWith("https://"))
+                let restore = false
+                if (needAuth) {
+                  const token = Flag.OPENCODE_SKILL_MARKET_TOKEN?.trim()
+                  if (!token) {
+                    log.warn("[skill/check-updates] skipping auth fetch, OPENCODE_SKILL_MARKET_TOKEN not set", { repoDir })
+                    continue
+                  }
+                  const parsed = new URL(remoteUrl)
+                  parsed.username = name
+                  parsed.password = token
+                  Bun.spawnSync(["git", "remote", "set-url", "origin", parsed.toString()], { cwd: repoDir })
+                  restore = true
+                }
+
+                try {
+                  const fetchProc = Bun.spawn(["git", "fetch", "origin"], { cwd: repoDir, stderr: "pipe" })
+                  await fetchProc.exited
+                  if (fetchProc.exitCode !== 0) {
+                    log.warn("[skill/check-updates] fetch failed", { repoDir, exitCode: fetchProc.exitCode })
+                    continue
+                  }
+
+                  const defaultBranchProc = Bun.spawnSync(["git", "symbolic-ref", "refs/remotes/origin/HEAD"], {
+                    cwd: repoDir,
+                  })
+                  const defaultBranchRef = new TextDecoder().decode(defaultBranchProc.stdout).trim()
+                  const branch = defaultBranchRef.replace("refs/remotes/origin/", "") || "main"
+
+                  const behindProc = Bun.spawnSync(
+                    ["git", "rev-list", `HEAD..origin/${branch}`, "--count"],
+                    { cwd: repoDir },
+                  )
+                  const behindStr = new TextDecoder().decode(behindProc.stdout).trim()
+                  const behind = parseInt(behindStr, 10)
+                  if (!Number.isNaN(behind) && behind > 0) {
+                    for (const skillName of skillNames) {
+                      updates[skillName] = { behind, branch }
+                    }
+                  }
+                } finally {
+                  if (restore) {
+                    Bun.spawnSync(["git", "remote", "set-url", "origin", remoteUrl], { cwd: repoDir })
+                  }
+                }
+              } catch (err) {
+                log.warn("[skill/check-updates] error checking repo", { repoDir, err: String(err) })
+              }
+            }
+
+            log.info("[skill/check-updates] done", { updateCount: Object.keys(updates).length })
+            return c.json({ updates })
           },
         )
         .post(
