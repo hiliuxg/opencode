@@ -255,7 +255,7 @@ sudo docker run  -d \
   -v /data1/opencode/base-1333/config:/root/.config/opencode \
   -v /data1/opencode/base-1333/local:/root/.local \
   opencode-v1313-04052340 \
-  --print-logs serve --hostname 0.0.0.0 --cors * --log-level DEBUG  
+  --print-logs serve --hostname 0.0.0.0 --cors * --log-level INFO  
 
 
 

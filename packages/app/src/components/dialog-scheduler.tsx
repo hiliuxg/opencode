@@ -25,7 +25,7 @@ import {
 } from "@/utils/admin-api"
 
 const DEFAULT_USER_ID = 1
-const DEFAULT_PROVIDER = "tme-continue-provider"
+const DEFAULT_PROVIDER = "tme-conv1-provider"
 const DEFAULT_MODEL = "Claude-Sonnet-4.6"
 
 
