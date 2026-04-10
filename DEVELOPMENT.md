@@ -232,13 +232,13 @@ export OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB
 OPENCODE_CHANNEL=latest OPENCODE_VERSION=1.3.13 ./packages/opencode/script/build.ts
 
 docker buildx build --platform linux/amd64 \
-      -t opencode-v1313-04052340 \
+      -t opencode-v1313-04101052 \
       --load \
       . 
 
-docker save -o opencode-v1313-04052340.tar opencode-v1313-04052340
+docker save -o opencode-v1313-04101052.tar opencode-v1313-04101052
 
-sudo docker load -i opencode-v1313-04052340.tar
+sudo docker load -i opencode-v1313-04101052.tar
   
   
 sudo docker run  -d \
@@ -254,7 +254,7 @@ sudo docker run  -d \
   -v /data1/opencode:/home \
   -v /data1/opencode/base-1333/config:/root/.config/opencode \
   -v /data1/opencode/base-1333/local:/root/.local \
-  opencode-v1313-04052340 \
+  opencode-v1313-04101052 \
   --print-logs serve --hostname 0.0.0.0 --cors * --log-level INFO  
 
 

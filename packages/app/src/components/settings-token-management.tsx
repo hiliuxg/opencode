@@ -52,19 +52,9 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                             "text"
                         ]
                     }
-                },
+                }
                 "GPT-5-mini": {
-                    "name": "GPT-5-mini",
-                    "modalities": {
-                        "input": [
-                            "text",
-                            "image",
-                            "pdf"
-                        ],
-                        "output": [
-                            "text"
-                        ]
-                    }
+                    "name": "GPT-5-mini"
                 },
                 "GPT-5.1": {
                     "name": "GPT-5.1",
@@ -81,6 +71,19 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "GPT-5.2": {
                     "name": "GPT-5.2",
+                    "modalities": {
+                        "input": [
+                            "text",
+                            "image",
+                            "pdf"
+                        ],
+                        "output": [
+                            "text"
+                        ]
+                    }
+                },
+                "GPT-5.4-nano": {
+                    "name": "GPT-5.4-nano",
                     "modalities": {
                         "input": [
                             "text",

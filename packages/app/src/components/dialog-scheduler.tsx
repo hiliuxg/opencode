@@ -29,8 +29,6 @@ const DEFAULT_PROVIDER = "tme-conv1-provider"
 const DEFAULT_MODEL = "Claude-Sonnet-4.6"
 
 
-
-
 // ── 新建任务 Tab ────────────────────────────────────
 
 function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
