@@ -395,7 +395,8 @@ export default function FileTree(props: {
   )
 
   const nodes = createMemo(() => {
-    const nodes = file.tree.children(props.path)
+    const raw = file.tree.children(props.path)
+    const nodes = level === 0 ? raw.filter((n) => !(n.type === "file" && n.name === "opencode.json")) : raw
     const current = filter()
     if (!current) return nodes
 

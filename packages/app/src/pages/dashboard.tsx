@@ -29,12 +29,14 @@ type SessionStat = { id: string; title: string; directory: string; tokens: numbe
 
 type ModelStat = { tokens: number; count: number }
 type ProviderModelKey = `${string}/${string}`
+type DayModelTokens = { input: number; output: number }
 
 type AccStats = {
   byDay: Record<string, DayStats>
   byDir: Record<string, DirStats>
   bySession: Record<string, SessionStat>
   byProviderModel: Record<ProviderModelKey, ModelStat>
+  byDayModel: Record<string, Record<ProviderModelKey, DayModelTokens>>
   totalTokens: number
   totalQuestions: number
 }
@@ -272,6 +274,7 @@ export default function Dashboard() {
     byDir: {},
     bySession: {},
     byProviderModel: {},
+    byDayModel: {},
     totalTokens: 0,
     totalQuestions: 0,
   })
@@ -290,7 +293,7 @@ export default function Dashboard() {
     async (range) => {
       const myVer = ++ver
 
-      setStats({ byDay: {}, byDir: {}, bySession: {}, byProviderModel: {}, totalTokens: 0, totalQuestions: 0 })
+      setStats({ byDay: {}, byDir: {}, bySession: {}, byProviderModel: {}, byDayModel: {}, totalTokens: 0, totalQuestions: 0 })
       setProgress({ loaded: 0, total: 0 })
 
       const result = await globalSDK.client.experimental.session.list({
@@ -342,6 +345,8 @@ export default function Dashboard() {
                 if (t > 0) {
                   sTokens += t
                   const key: ProviderModelKey = `${assistantMsg.providerID}/${assistantMsg.modelID}`
+                  const inp = assistantMsg.tokens.input
+                  const out = assistantMsg.tokens.output + assistantMsg.tokens.reasoning
                   setStats(
                     produce((s) => {
                       if (!s.byDay[day]) s.byDay[day] = { tokens: 0, questions: 0, sessions: 0, dirs: {} }
@@ -349,6 +354,10 @@ export default function Dashboard() {
                       if (!s.byProviderModel[key]) s.byProviderModel[key] = { tokens: 0, count: 0 }
                       s.byProviderModel[key].tokens += t
                       s.byProviderModel[key].count++
+                      if (!s.byDayModel[day]) s.byDayModel[day] = {}
+                      if (!s.byDayModel[day][key]) s.byDayModel[day][key] = { input: 0, output: 0 }
+                      s.byDayModel[day][key].input += inp
+                      s.byDayModel[day][key].output += out
                     }),
                   )
                 }
@@ -765,6 +774,77 @@ export default function Dashboard() {
     ],
   }))
 
+  // Top models for the day-model chart (by total tokens, capped at 8 for readability)
+  const topDayModels = createMemo(() =>
+    (Object.keys(stats.byProviderModel) as ProviderModelKey[])
+      .sort((a, b) => stats.byProviderModel[b].tokens - stats.byProviderModel[a].tokens)
+      .slice(0, 8),
+  )
+
+  const dayModelChartOption = createMemo<echarts.EChartsCoreOption>(() => {
+    const models = topDayModels()
+    const label = (k: string) => {
+      const parts = k.split("/")
+      return parts.length >= 2 ? parts[1] : k
+    }
+    return {
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(255,255,255,0.95)",
+        borderColor: "#e5e7eb",
+        textStyle: { color: "#374151", fontSize: 12 },
+        formatter: (params: any[]) => {
+          if (!params?.length) return ""
+          const date = params[0].name
+          const lines = params
+            .filter((p) => p.value > 0)
+            .map((p) => `<span style="color:${p.color}">●</span> ${p.seriesName}: ${formatNum(p.value)}`)
+          return [date, ...lines].join("<br/>")
+        },
+      },
+      legend: {
+        data: models.map(label),
+        bottom: 0,
+        textStyle: { color: "#6b7280", fontSize: 10 },
+        type: "scroll",
+      },
+      grid: { left: 60, right: 20, top: 30, bottom: 50 },
+      xAxis: {
+        type: "category",
+        data: days(),
+        axisLine: { lineStyle: { color: "#d1d5db" } },
+        axisLabel: { color: "#6b7280", fontSize: 10, formatter: (v: string) => v.slice(5) },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#f3f4f6" } },
+        axisLabel: { color: "#9ca3af", fontSize: 10, formatter: (v: number) => formatNum(v) },
+      },
+      series: models.map((model, i) => ({
+        name: label(model),
+        type: "bar",
+        stack: "total",
+        data: days().map((d) => {
+          const m = stats.byDayModel[d]?.[model]
+          return m ? m.input + m.output : 0
+        }),
+        barMaxWidth: 40,
+        itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: i === models.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0] },
+      })),
+    }
+  })
+
+  const dayModelTableRows = createMemo(() =>
+    days().flatMap((d) =>
+      Object.entries(stats.byDayModel[d] ?? {})
+        .sort((a, b) => b[1].input + b[1].output - (a[1].input + a[1].output))
+        .map(([model, t]) => ({ date: d, model, input: t.input, output: t.output })),
+    ),
+  )
+
   const totalDirs = createMemo(() => Object.keys(stats.byDir).length)
   const totalSessions = createMemo(() =>
     Object.values(stats.byDir).reduce((sum, d) => sum + d.sessions, 0),
@@ -948,6 +1028,25 @@ export default function Dashboard() {
             }
           />
         </ChartSection>
+
+        {/* ── Daily Token by ProviderModel Chart ── */}
+        <Show when={topDayModels().length > 0}>
+          <ChartSection
+            title={language.t("dashboard.dayModel.title")}
+            sub={language.t("dashboard.dayModel.sub")}
+          >
+            <ChartWithTable
+              option={dayModelChartOption()}
+              columns={[
+                { key: "date", title: language.t("common.date"), align: "left" },
+                { key: "model", title: language.t("dashboard.dayModel.colModel"), align: "left" },
+                { key: "input", title: language.t("dashboard.dayModel.colInput"), align: "right", formatter: formatNum },
+                { key: "output", title: language.t("dashboard.dayModel.colOutput"), align: "right", formatter: formatNum },
+              ]}
+              data={dayModelTableRows}
+            />
+          </ChartSection>
+        </Show>
 
         {/* ── Per-Directory Bar Charts ── */}
         <Show when={dirList().length > 0}>

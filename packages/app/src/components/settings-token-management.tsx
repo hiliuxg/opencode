@@ -52,7 +52,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                             "text"
                         ]
                     }
-                }
+                },
                 "GPT-5-mini": {
                     "name": "GPT-5-mini"
                 },

@@ -1099,6 +1099,11 @@ export const dict = {
   "dashboard.dailyDirs.sub": "Number of workspace directories used per day",
   "dashboard.dailyDirDetail.title": "Daily Directory Detail",
   "dashboard.dailyDirDetail.sub": "All directories active per day, sorted by date ascending",
+  "dashboard.dayModel.title": "Daily Tokens by Provider / Model",
+  "dashboard.dayModel.sub": "Input and output token usage per model per day (output includes reasoning tokens)",
+  "dashboard.dayModel.colModel": "Provider/Model",
+  "dashboard.dayModel.colInput": "Input Tokens",
+  "dashboard.dayModel.colOutput": "Output Tokens",
 
   "session.new.guidedTopics.label": "Suggested Topics",
   "session.new.guidedTopics.loading": "Loading topics...",
@@ -1123,7 +1128,7 @@ export const dict = {
   "settings.permissions.tool.todoread.description": "Read the todo list",
 
   "settings.tokenManagement.title": "Token Management",
-  "settings.tokenManagement.description": "Manage API tokens in the opencode.json config.",
+  "settings.tokenManagement.description": "Manage your API access tokens.",
   "settings.tokenManagement.providerList": "Configured providers",
   "settings.tokenManagement.copyToken": "Copy token",
   "settings.tokenManagement.regenerateToken": "Get new token",

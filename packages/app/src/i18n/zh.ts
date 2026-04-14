@@ -1080,6 +1080,11 @@ export const dict = {
   "dashboard.dailyDirs.sub": "每天有多少个工作目录被使用过",
   "dashboard.dailyDirDetail.title": "每日目录明细",
   "dashboard.dailyDirDetail.sub": "每天活跃的去重目录列表，按日期升序排列",
+  "dashboard.dayModel.title": "每日各模型 Token 消耗",
+  "dashboard.dayModel.sub": "每天各 Provider/Model 的输入与输出 token 用量（输出包含 reasoning token）",
+  "dashboard.dayModel.colModel": "Provider/Model",
+  "dashboard.dayModel.colInput": "输入 Tokens",
+  "dashboard.dayModel.colOutput": "输出 Tokens",
 
   "session.new.guidedTopics.label": "推荐话题",
   "session.new.guidedTopics.loading": "话题加载中...",
@@ -1104,7 +1109,7 @@ export const dict = {
   "settings.permissions.tool.todoread.description": "读取待办列表",
 
   "settings.tokenManagement.title": "令牌管理",
-  "settings.tokenManagement.description": "管理 opencode.json 配置中的 API 令牌。",
+  "settings.tokenManagement.description": "管理您的 API 访问令牌。",
   "settings.tokenManagement.providerList": "已配置的提供商",
   "settings.tokenManagement.copyToken": "复制令牌",
   "settings.tokenManagement.regenerateToken": "获取新令牌",
