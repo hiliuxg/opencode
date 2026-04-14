@@ -8,6 +8,9 @@ const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
 
+// WebFetch specific proxy config - only used by this tool
+const WEBFETCH_PROXY = process.env["OPENCODE_WEBFETCH_PROXY"]
+
 export const WebFetchTool = Tool.define("webfetch", {
   description: DESCRIPTION,
   parameters: z.object({
@@ -17,6 +20,7 @@ export const WebFetchTool = Tool.define("webfetch", {
       .default("markdown")
       .describe("The format to return the content in (text, markdown, or html). Defaults to markdown."),
     timeout: z.number().describe("Optional timeout in seconds (max 120)").optional(),
+    proxy: z.string().describe("Optional proxy URL (e.g., http://proxy:8080). Falls back to OPENCODE_WEBFETCH_PROXY env var.").optional(),
   }),
   async execute(params, ctx) {
     // Validate URL
@@ -32,6 +36,7 @@ export const WebFetchTool = Tool.define("webfetch", {
         url: params.url,
         format: params.format,
         timeout: params.timeout,
+        proxy: params.proxy || WEBFETCH_PROXY,
       },
     })
 
@@ -62,12 +67,19 @@ export const WebFetchTool = Tool.define("webfetch", {
       "Accept-Language": "en-US,en;q=0.9",
     }
 
-    const initial = await fetch(params.url, { signal, headers })
+    // Proxy config: param takes precedence over env var
+    const proxy = params.proxy || WEBFETCH_PROXY
+    const fetchOpts: RequestInit & { proxy?: string } = { signal, headers }
+    if (proxy) fetchOpts.proxy = proxy
+
+    const initial = await fetch(params.url, fetchOpts)
 
     // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
+    const retryOpts: RequestInit & { proxy?: string } = { signal, headers: { ...headers, "User-Agent": "opencode" } }
+    if (proxy) retryOpts.proxy = proxy
     const response =
       initial.status === 403 && initial.headers.get("cf-mitigated") === "challenge"
-        ? await fetch(params.url, { signal, headers: { ...headers, "User-Agent": "opencode" } })
+        ? await fetch(params.url, retryOpts)
         : initial
 
     clearTimeout()

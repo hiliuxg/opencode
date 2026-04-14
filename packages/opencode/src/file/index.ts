@@ -741,7 +741,6 @@ export namespace File {
         return { data, filename: path.basename(full), mime: AppFileSystem.mimeType(full) }
       })
 
-      log.info("init")
       return Service.of({ init, status, read, list, search, write, mkdir, remove, rename, serve, download })
     }),
   )
@@ -792,5 +791,24 @@ export namespace File {
 
   export async function download(target: string) {
     return runPromise((svc) => svc.download(target))
+  }
+
+  export async function share(filepath: string): Promise<string> {
+    const relative = filepath.startsWith("/") ? filepath.slice(1) : filepath
+    const full = path.join(Instance.directory, relative)
+    if (!Instance.containsPath(full)) throw new Error("Access denied: path escapes project directory")
+    const filename = full.split("/").pop() || full
+    const form = new FormData()
+    form.append("file", Bun.file(full), filename)
+    const resp = await fetch("http://10.5.132.186:8000/api/v1/report-html/upload", {
+      method: "POST",
+      body: form,
+    })
+    if (!resp.ok) throw new Error("Upload failed")
+    const json = await resp.json() as { url?: string; data?: { url?: string } }
+    let url = json.url ?? (json.data && typeof json.data === "object" ? json.data.url : "") ?? ""
+    if (!url) throw new Error("No URL returned")
+    if (url.startsWith("/")) url = `https://kudata-agent.tmeoa.com${url}`
+    return url
   }
 }

@@ -25,10 +25,12 @@ const DEFAULT_CONFIG_TEMPLATE = `{
             },
             "models": {
                 "Claude-Haiku-4.5(速度快)": {
-                    "name": "Claude-Haiku-4.5(速度快)"
+                    "name": "Claude-Haiku-4.5(速度快)",
+                    "limit": { "context": 100000, "output": 64000 }
                 },
                 "Claude-Sonnet-4.5": {
                     "name": "Claude-Sonnet-4.5",
+                    "limit": { "context": 100000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -42,6 +44,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "Claude-Sonnet-4.6": {
                     "name": "Claude-Sonnet-4.6",
+                    "limit": { "context": 100000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -54,10 +57,12 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                     }
                 },
                 "GPT-5-mini": {
-                    "name": "GPT-5-mini"
+                    "name": "GPT-5-mini",
+                    "limit": { "context": 200000, "output": 64000 }
                 },
                 "GPT-5.1": {
                     "name": "GPT-5.1",
+                    "limit": { "context": 200000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -71,6 +76,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "GPT-5.2": {
                     "name": "GPT-5.2",
+                    "limit": { "context": 200000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -84,6 +90,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "GPT-5.4-nano": {
                     "name": "GPT-5.4-nano",
+                    "limit": { "context": 200000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -97,6 +104,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "GPT-5.4": {
                     "name": "GPT-5.4",
+                    "limit": { "context": 525000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -110,6 +118,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "Gemini-3-Flash": {
                     "name": "Gemini-3-Flash",
+                    "limit": { "context": 100000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -123,6 +132,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "Gemini-3.1-Pro": {
                     "name": "Gemini-3.1-Pro",
+                    "limit": { "context": 500000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
@@ -135,10 +145,12 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                     }
                 },
                 "TME DeepSeek-V3.1-Terminus": {
-                    "name": "TME DeepSeek-V3.1-Terminus"
+                    "name": "TME DeepSeek-V3.1-Terminus",
+                    "limit": { "context": 64000, "output": 32000 }
                 },
                 "TME DeepSeek-V3.2": {
-                    "name": "TME DeepSeek-V3.2"
+                    "name": "TME DeepSeek-V3.2",
+                    "limit": { "context": 64000, "output": 32000 }
                 }
             }
         },
@@ -151,19 +163,24 @@ const DEFAULT_CONFIG_TEMPLATE = `{
             },
             "models": {
                 "DeepSeek-V3.2": {
-                    "name": "DeepSeek-V3.2"
+                    "name": "DeepSeek-V3.2",
+                    "limit": { "context": 64000, "output": 32000 }
                 },
                 "GLM-4.7": {
-                    "name": "GLM-4.7"
+                    "name": "GLM-4.7",
+                    "limit": { "context": 100000, "output": 64000 }
                 },
                 "GLM-5.1": {
-                    "name": "GLM-5.1"
+                    "name": "GLM-5.1",
+                    "limit": { "context": 100000, "output": 64000 }
                 },
                 "GLM-5": {
-                    "name": "GLM-5"
+                    "name": "GLM-5",
+                    "limit": { "context": 100000, "output": 64000 }
                 },
                 "Kimi-K2.5": {
                     "name": "Kimi-K2.5",
+                    "limit": { "context": 128000, "output": 64000 },
                     "modalities": {
                         "input": [
                             "text",
