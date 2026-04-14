@@ -1489,7 +1489,7 @@ export default function Layout(props: ParentProps) {
     const name = next === getFilename(project.worktree) ? "" : next
 
     if (project.id && project.id !== "global") {
-      await globalSDK.client.project.update({ projectID: project.id, directory: project.worktree, name })
+      await globalSDK.client.project.update({ projectID: project.id, directory: project.worktree, body_name: name })
       return
     }
 

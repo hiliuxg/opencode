@@ -73,9 +73,9 @@ export const DialogSelectMcp: Component = () => {
     mutationFn: async (name: string) => {
       const status = sync.data.mcp[name]
       if (status?.status === "connected") {
-        await sdk.client.mcp.disconnect({ name })
+        await sdk.client.mcp.disconnect({ path_name: name })
       } else {
-        await sdk.client.mcp.connect({ name })
+        await sdk.client.mcp.connect({ path_name: name })
       }
 
       const result = await sdk.client.mcp.status()

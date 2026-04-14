@@ -1218,7 +1218,7 @@ export namespace ACP {
             .add(
               {
                 directory,
-                name: key,
+                body_name: key,
                 config: mcp,
               },
               { throwOnError: true },

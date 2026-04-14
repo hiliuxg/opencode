@@ -80,7 +80,7 @@ export function DialogEditProject(props: { project: LocalProject }) {
         await globalSDK.client.project.update({
           projectID: props.project.id,
           directory: props.project.worktree,
-          name,
+          body_name: name,
           icon: { color: store.color, override: store.iconUrl },
           commands: { start },
         })
