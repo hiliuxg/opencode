@@ -361,7 +361,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
         description: info()?.share?.url
           ? language.t("toast.session.share.success.description")
           : language.t("command.session.share.description"),
-        slash: "share",
         disabled: !params.id,
         onSelect: share,
       }),
@@ -369,7 +368,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
         id: "session.unshare",
         title: language.t("command.session.unshare"),
         description: language.t("command.session.unshare.description"),
-        slash: "unshare",
         disabled: !params.id || !info()?.share?.url,
         onSelect: unshare,
       }),
@@ -452,7 +450,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       id: "terminal.toggle",
       title: language.t("command.terminal.toggle"),
       keybind: "ctrl+`",
-      slash: "terminal",
       onSelect: () => view().terminal.toggle(),
     }),
     viewCommand({
@@ -528,7 +525,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       title: language.t("command.mcp.toggle"),
       description: language.t("command.mcp.toggle.description"),
       keybind: "mod+;",
-      slash: "mcp",
       onSelect: chooseMcp,
     }),
   ]
@@ -539,7 +535,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       title: language.t("command.agent.cycle"),
       description: language.t("command.agent.cycle.description"),
       keybind: "mod+.",
-      slash: "agent",
       onSelect: () => local.agent.move(1),
     }),
     agentCommand({

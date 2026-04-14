@@ -321,6 +321,16 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       return url.toString()
     }
 
+    const share = async (target: string): Promise<string> => {
+      const url = new URL(`${sdk.url.replace(/\/$/, "")}/file/share`)
+      url.searchParams.set("path", target)
+      url.searchParams.set("directory", sdk.directory)
+      const resp = await fetch(url.toString())
+      if (!resp.ok) throw new Error("Share failed")
+      const json = await resp.json() as { url: string }
+      return json.url
+    }
+
     return {
       ready: () => view().ready(),
       normalize: path.normalize,
@@ -358,6 +368,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       upload,
       download: downloadFile,
       serveUrl,
+      share,
     }
   },
 })

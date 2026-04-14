@@ -1,7 +1,11 @@
 import type { E2EWindow } from "./terminal"
 
 export type PromptProbeState = {
-  popover: "at" | null
+  popover: "at" | "slash" | null
+  slash?: {
+    active: string | null
+    ids: string[]
+  }
 }
 
 export const promptEnabled = () => {

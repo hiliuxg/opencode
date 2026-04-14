@@ -103,6 +103,9 @@ export namespace Flag {
   export const OPENCODE_SKIP_MIGRATIONS = truthy("OPENCODE_SKIP_MIGRATIONS")
   export const OPENCODE_STRICT_CONFIG_DEPS = truthy("OPENCODE_STRICT_CONFIG_DEPS")
 
+  // WebFetch tool specific proxy config
+  export const OPENCODE_WEBFETCH_PROXY = process.env["OPENCODE_WEBFETCH_PROXY"]
+
   function number(key: string) {
     const value = process.env[key]
     if (!value) return undefined

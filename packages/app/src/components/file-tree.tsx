@@ -251,7 +251,9 @@ export type FileTreeOps = {
   onNewFolder?: (dir: string, name: string) => void
   onMove?: (src: string, dst: string) => void
   onDownload?: (node: FileNode) => void
+  onCopy?: (node: FileNode) => void
   onPreview?: (node: FileNode) => void
+  onShare?: (node: FileNode) => void
   onUpload?: (dir: string, items: DataTransferItemList) => void
 }
 
@@ -502,6 +504,10 @@ export default function FileTree(props: {
         <Icon name="download" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.download")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => props.ops?.onCopy?.(node)}>
+        <Icon name="copy" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.copy")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "rename" })}>
         <Icon name="pencil-line" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.rename")}</ContextMenu.ItemLabel>
@@ -510,13 +516,17 @@ export default function FileTree(props: {
         <Icon name="trash" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.delete")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
+      <ContextMenu.Separator />
       <Show when={isHtml(node.name)}>
-        <ContextMenu.Separator />
         <ContextMenu.Item onSelect={() => props.ops?.onPreview?.(node)}>
           <Icon name="eye" />
           <ContextMenu.ItemLabel>{language.t("fileTree.menu.preview")}</ContextMenu.ItemLabel>
         </ContextMenu.Item>
       </Show>
+      <ContextMenu.Item onSelect={() => props.ops?.onShare?.(node)}>
+        <Icon name="share" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.share")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
     </>
   )
 

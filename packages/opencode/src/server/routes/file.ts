@@ -286,6 +286,25 @@ export const FileRoutes = lazy(() =>
       },
     )
     .get(
+      "/file/share",
+      describeRoute({
+        summary: "Share file",
+        description: "Upload a file to the report server and return a shareable URL.",
+        operationId: "file.share",
+        responses: {
+          200: {
+            description: "Shareable URL",
+            content: { "application/json": { schema: resolver(z.object({ url: z.string() })) } },
+          },
+        },
+      }),
+      validator("query", z.object({ path: z.string() })),
+      async (c) => {
+        const url = await File.share(c.req.valid("query").path)
+        return c.json({ url })
+      },
+    )
+    .get(
       "/file/serve",
       describeRoute({
         summary: "Serve file",

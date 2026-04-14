@@ -366,8 +366,40 @@ export function SessionSidePanel(props: {
         })
       })
     },
+    onCopy: async (node) => {
+      try {
+        const resp = await fetch(file.serveUrl(node.path))
+        if (!resp.ok) throw new Error("Read failed")
+        const text = await resp.text()
+        const p = node.path
+        const dot = p.lastIndexOf(".")
+        const slash = p.lastIndexOf("/")
+        const dst = dot > slash ? p.slice(0, dot) + "_copy" + p.slice(dot) : p + "_copy"
+        await file.write(dst, text)
+        showToast({ title: language.t("fileTree.toast.copySuccess") })
+      } catch (err) {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.copyFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      }
+    },
     onPreview: (node) => {
       window.open(file.serveUrl(node.path), "_blank")
+    },
+    onShare: async (node) => {
+      try {
+        const url = await file.share(node.path)
+        await navigator.clipboard.writeText(url)
+        showToast({ title: language.t("fileTree.toast.shareSuccess") })
+      } catch (err) {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.shareFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      }
     },
     onUpload: async (dir, items) => {
       const entries: FileSystemEntry[] = []
