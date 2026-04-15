@@ -4,6 +4,8 @@ type Keys = keyof typeof en
 
 export const dict = {
   "editor.addToChat": "快速修改",
+  "editor.mode.editor": "编辑",
+  "editor.mode.preview": "预览",
   "command.category.suggested": "建议",
   "command.category.view": "视图",
   "command.category.project": "项目",
@@ -1174,4 +1176,10 @@ export const dict = {
   "scheduler.jobs.filter.all": "全部",
   "scheduler.jobs.filter.enabled": "已启用",
   "scheduler.jobs.filter.disabled": "已禁用",
+
+  "excel.error": "Excel 文件解析失败",
+  "excel.empty": "此工作表为空",
+  "excel.stats.rows": "{{count}} 行",
+  "excel.stats.cols": "{{count}} 列",
+  "excel.stats.sheets": "{{count}} 个工作表",
 } satisfies Partial<Record<Keys, string>>

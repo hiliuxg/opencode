@@ -290,7 +290,9 @@ export namespace File {
 
   const ext = (file: string) => path.extname(file).toLowerCase().slice(1)
   const name = (file: string) => path.basename(file).toLowerCase()
+  const spreadsheet = new Set(["xls", "xlsx", "xlsm", "xlsb"])
   const isImageByExtension = (file: string) => image.has(ext(file))
+  const isSpreadsheet = (file: string) => spreadsheet.has(ext(file))
   const isTextByExtension = (file: string) => text.has(ext(file))
   const isTextByName = (file: string) => textName.has(name(file))
   const isBinaryByExtension = (file: string) => binary.has(ext(file))
@@ -539,6 +541,20 @@ export namespace File {
             }
           }
           return { type: "text" as const, content: "" }
+        }
+
+        if (isSpreadsheet(file)) {
+          const exists = yield* appFs.existsSafe(full)
+          if (exists) {
+            const bytes = yield* appFs.readFile(full).pipe(Effect.catch(() => Effect.succeed(new Uint8Array())))
+            return {
+              type: "binary" as const,
+              content: Buffer.from(bytes).toString("base64"),
+              mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              encoding: "base64" as const,
+            }
+          }
+          return { type: "binary" as const, content: "" }
         }
 
         const knownText = isTextByExtension(file) || isTextByName(file)

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, Match, on, onCleanup, Switch } from "solid-js"
+import { createEffect, createMemo, createSignal, Match, on, onCleanup, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import type { FileSearchHandle } from "@opencode-ai/ui/file"
@@ -7,8 +7,10 @@ import { cloneSelectedLineRange, previewSelectedLines } from "@opencode-ai/ui/pi
 import { createLineCommentController } from "@opencode-ai/ui/line-comment-annotations"
 import { sampledChecksum } from "@opencode-ai/util/encode"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
+import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tabs } from "@opencode-ai/ui/tabs"
+import { Markdown } from "@opencode-ai/ui/markdown"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { showToast } from "@opencode-ai/ui/toast"
 import { selectionFromLines, useFile, type FileSelection, type SelectedLineRange } from "@/context/file"
@@ -19,6 +21,8 @@ import { getSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { MonacoEditor } from "@/components/monaco-editor"
+import { ExcelViewer } from "@/components/excel-viewer"
+
 
 function FileCommentMenu(props: {
   moreLabel: string
@@ -215,6 +219,18 @@ export function FileTabContent(props: { tab: string }) {
     const mime = content.mimeType ?? ""
     return mime.startsWith("image/") || mime.startsWith("audio/") || mime.startsWith("video/")
   })
+  const isExcel = createMemo(() => {
+    const p = path()
+    if (!p) return false
+    return /\.(xlsx?|xlsm|xlsb|csv)$/i.test(p)
+  })
+  const isMd = createMemo(() => /\.md$/i.test(path() ?? ""))
+  const [preview, setPreview] = createSignal(false)
+
+  createEffect(
+    on(path, () => { setPreview(false) }, { defer: true }),
+  )
+
   const selectedLines = createMemo<SelectedLineRange | null>(() => {
     const p = path()
     if (!p) return null
@@ -476,7 +492,41 @@ export function FileTabContent(props: { tab: string }) {
 
   return (
     <Tabs.Content value={props.tab} class="mt-3 relative h-full">
+      <Show when={isMd()}>
+        <div class="absolute top-2 right-4 z-10 flex overflow-hidden rounded-md border border-border-weak-base bg-surface-raised-base">
+          <button
+            type="button"
+            class="flex cursor-pointer items-center gap-1 px-2 py-1 text-13-regular"
+            classList={{
+              "bg-element-active text-text-strong": !preview(),
+              "text-text-weak": preview(),
+            }}
+            onClick={() => setPreview(false)}
+          >
+            {language.t("editor.mode.editor")}
+          </button>
+          <button
+            type="button"
+            class="flex cursor-pointer items-center gap-1 px-2 py-1 text-13-regular"
+            classList={{
+              "bg-element-active text-text-strong": preview(),
+              "text-text-weak": !preview(),
+            }}
+            onClick={() => setPreview(true)}
+          >
+            {language.t("editor.mode.preview")}
+          </button>
+        </div>
+      </Show>
       <Switch>
+        <Match when={state()?.loaded && isExcel()}>
+          <ExcelViewer content={contents()} filePath={path() ?? ""} class="h-full" />
+        </Match>
+        <Match when={state()?.loaded && isMd() && preview()}>
+          <ScrollView class="h-full px-6 py-4">
+            <Markdown text={contents()} cacheKey={cacheKey()} class="prose" />
+          </ScrollView>
+        </Match>
         <Match when={state()?.loaded && !isMedia()}>
           <MonacoEditor
             value={contents()}

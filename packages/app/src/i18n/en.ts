@@ -1,5 +1,7 @@
 export const dict = {
   "editor.addToChat": "Add to chat",
+  "editor.mode.editor": "Editor",
+  "editor.mode.preview": "Preview",
   "command.category.suggested": "Suggested",
   "command.category.view": "View",
   "command.category.project": "Project",
@@ -942,7 +944,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 session will be archived.",
   "workspace.reset.archived.many": "{{count}} sessions will be archived.",
   "workspace.reset.note": "This will reset the workspace to match the default branch.",
-
   "fileTree.menu.open": "Open",
   "fileTree.menu.download": "Download",
   "fileTree.menu.rename": "Rename",
@@ -1193,4 +1194,10 @@ export const dict = {
   "scheduler.jobs.filter.all": "All",
   "scheduler.jobs.filter.enabled": "Enabled",
   "scheduler.jobs.filter.disabled": "Disabled",
+
+  "excel.error": "Failed to parse Excel file",
+  "excel.empty": "This sheet is empty",
+  "excel.stats.rows": "{{count}} rows",
+  "excel.stats.cols": "{{count}} columns",
+  "excel.stats.sheets": "{{count}} sheets",
 }
