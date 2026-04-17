@@ -103,15 +103,6 @@ export const SidebarContent = (props: {
           </DragDropProvider>
         </div>
         <div class="shrink-0 w-full pt-3 pb-6 flex flex-col items-center gap-2">
-          <Tooltip placement={placement()} value={props.schedulerLabel()}>
-            <IconButton
-              icon="clock"
-              variant="ghost"
-              size="large"
-              onClick={props.onOpenScheduler}
-              aria-label={props.schedulerLabel()}
-            />
-          </Tooltip>
           <Tooltip
             placement={placement()}
             value={
@@ -135,6 +126,15 @@ export const SidebarContent = (props: {
                 <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-icon-critical-base pointer-events-none animate-pulse" />
               </Show>
             </div>
+          </Tooltip>
+          <Tooltip placement={placement()} value={props.schedulerLabel()}>
+            <IconButton
+              icon="clock"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenScheduler}
+              aria-label={props.schedulerLabel()}
+            />
           </Tooltip>
           <Tooltip placement={placement()} value={props.apiDocLabel()}>
             <IconButton
