@@ -2326,9 +2326,14 @@ function EChartsRenderer(props: { data: string }) {
     const legend = raw.map((s: any) => s.name).filter(Boolean)
     if (legend.length > 0) opt.legend = { data: legend }
 
+    const typeMap: Record<string, string> = {
+      折线图: "line", 线图: "line", 柱状图: "bar", 条形图: "bar",
+      饼图: "pie", 散点图: "scatter", 面积图: "line",
+    }
+    const chartType = typeMap[data.chart_type] ?? data.chart_type ?? "bar"
     opt.series = raw.map((s: any) => ({
       ...s,
-      type: data.chart_type || s.type || "bar",
+      type: typeMap[s.type] ?? s.type ?? chartType,
     }))
 
     chart.setOption(opt)

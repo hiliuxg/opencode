@@ -1,4 +1,4 @@
-import { Component, createSignal, createResource, For, Show, createMemo } from "solid-js"
+import { Component, createSignal, createResource, For, Show, createMemo, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
@@ -11,14 +11,18 @@ import { Switch } from "@opencode-ai/ui/switch"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useLanguage } from "@/context/language"
+import { useModels } from "@/context/models"
+import { ModelSelectorPopover, type ModelState } from "./dialog-select-model"
 import {
     getJobs,
     createJob,
+    updateJob,
     deleteJob,
     toggleJob,
     runJob,
     getExecutions,
     cronFromSchedule,
+    parseCronToSchedule,
     type CronJob,
     type Execution,
     type ScheduleType,
@@ -31,17 +35,31 @@ const DEFAULT_MODEL = "Claude-Sonnet-4.6"
 
 // ── 新建任务 Tab ────────────────────────────────────
 
-function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
+function CreateJobTab(props: {
+    onCreated: () => void
+    workspaceDir: string
+    editingJob?: CronJob | null
+    onUpdated?: () => void
+    onCancelEdit?: () => void
+}) {
     const { t } = useLanguage()
+    const models = useModels()
 
     const SCHEDULE_TYPES: { value: ScheduleType; label: string }[] = [
-        { value: "daily", label: t("scheduler.create.frequency.daily") },
         { value: "hourly", label: t("scheduler.create.frequency.hourly") },
+        { value: "daily", label: t("scheduler.create.frequency.daily") },
+        { value: "weekly", label: t("scheduler.create.frequency.weekly") },
+        { value: "monthly", label: t("scheduler.create.frequency.monthly") },
     ]
 
     const HOURS = Array.from({ length: 24 }, (_, i) => ({
         value: i,
-        label: `${String(i).padStart(2, "0")}:00`,
+        label: `${String(i).padStart(2, "0")} ${t("scheduler.create.frequency.hour")}`,
+    }))
+
+    const MINUTES = Array.from({ length: 60 }, (_, i) => ({
+        value: i,
+        label: `${String(i).padStart(2, "0")} ${t("scheduler.create.frequency.minute")}`,
     }))
 
     const HOUR_INTERVALS = [1, 2, 3, 4, 6, 8, 12].map((v) => ({
@@ -49,15 +67,133 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
         label: t("scheduler.create.frequency.everyHour", { v }),
     }))
 
+    const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 7].map((v) => ({
+        value: v,
+        label: t(`scheduler.create.frequency.dayOfWeek.${v}` as any),
+    }))
+
+    const MONTH_DATES = Array.from({ length: 31 }, (_, i) => ({
+        value: i + 1,
+        label: `${i + 1} ${t("scheduler.create.frequency.dateOfMonth")}`,
+    }))
+
     const [form, setForm] = createStore({
         name: "",
         scheduleType: "daily" as ScheduleType,
-        dailyHour: 9,
         hourlyInterval: 1,
+        hourlyMinute: 0,
+        dailyHour: 9,
+        dailyMinute: 0,
+        weeklyDay: 1,
+        weeklyHour: 9,
+        weeklyMinute: 0,
+        monthlyDate: 1,
+        monthlyHour: 9,
+        monthlyMinute: 0,
         timezone: "Asia/Shanghai",
         prompt: "",
     })
     const [submitting, setSubmitting] = createSignal(false)
+    const [picked, setPicked] = createSignal<{ providerID: string; modelID: string }>({
+        providerID: DEFAULT_PROVIDER,
+        modelID: DEFAULT_MODEL,
+    })
+
+    // Pre-fill form when editingJob changes
+    createEffect(() => {
+        const job = props.editingJob
+        if (!job) return
+        const parsed = parseCronToSchedule(job.cronExpression)
+        setForm({
+            name: job.name,
+            scheduleType: parsed.type,
+            hourlyInterval: parsed.type === "hourly" ? parsed.interval : 1,
+            hourlyMinute: parsed.type === "hourly" ? parsed.minute : 0,
+            dailyHour: parsed.type === "daily" ? parsed.hour : 9,
+            dailyMinute: parsed.type === "daily" ? parsed.minute : 0,
+            weeklyDay: parsed.type === "weekly" ? parsed.day : 1,
+            weeklyHour: parsed.type === "weekly" ? parsed.hour : 9,
+            weeklyMinute: parsed.type === "weekly" ? parsed.minute : 0,
+            monthlyDate: parsed.type === "monthly" ? parsed.date : 1,
+            monthlyHour: parsed.type === "monthly" ? parsed.hour : 9,
+            monthlyMinute: parsed.type === "monthly" ? parsed.minute : 0,
+            timezone: job.timezone ?? "Asia/Shanghai",
+            prompt: job.prompt ?? "",
+        })
+        if (job.config?.providerID && job.config?.modelID) {
+            setPicked({ providerID: job.config.providerID, modelID: job.config.modelID })
+        }
+    })
+
+    const modelState = {
+        ready: models.ready,
+        current: () => models.find(picked()),
+        recent: createMemo(() => []),
+        list: models.list,
+        cycle: () => {},
+        set: (item: { providerID: string; modelID: string } | undefined) => {
+            if (item) setPicked({ providerID: item.providerID, modelID: item.modelID })
+        },
+        visible: (item: { providerID: string; modelID: string }) => models.visible(item),
+        setVisibility: () => {},
+        variant: {
+            configured: () => undefined,
+            selected: () => undefined,
+            current: () => undefined,
+            list: () => [],
+            set: () => {},
+            cycle: () => {},
+        },
+    } as unknown as ModelState
+
+    const modelLabel = () => {
+        const current = modelState.current()
+        if (current) return `${current.provider.name} · ${current.name}`
+        return `${picked().providerID} · ${picked().modelID}`
+    }
+
+    const buildCron = () => {
+        if (form.scheduleType === "hourly") {
+            return cronFromSchedule({ type: "hourly", interval: form.hourlyInterval, minute: form.hourlyMinute })
+        }
+        if (form.scheduleType === "daily") {
+            return cronFromSchedule({ type: "daily", hour: form.dailyHour, minute: form.dailyMinute })
+        }
+        if (form.scheduleType === "weekly") {
+            return cronFromSchedule({
+                type: "weekly",
+                day: form.weeklyDay,
+                hour: form.weeklyHour,
+                minute: form.weeklyMinute,
+            })
+        }
+        return cronFromSchedule({
+            type: "monthly",
+            date: form.monthlyDate,
+            hour: form.monthlyHour,
+            minute: form.monthlyMinute,
+        })
+    }
+
+    const resetForm = () => {
+        setForm({
+            name: "",
+            scheduleType: "daily",
+            hourlyInterval: 1,
+            hourlyMinute: 0,
+            dailyHour: 9,
+            dailyMinute: 0,
+            weeklyDay: 1,
+            weeklyHour: 9,
+            weeklyMinute: 0,
+            monthlyDate: 1,
+            monthlyHour: 9,
+            monthlyMinute: 0,
+            timezone: "Asia/Shanghai",
+            prompt: "",
+        })
+        setPicked({ providerID: DEFAULT_PROVIDER, modelID: DEFAULT_MODEL })
+    }
 
     const handleSubmit = async () => {
         if (!form.name.trim() || !form.prompt.trim()) {
@@ -65,29 +201,36 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
             return
         }
         setSubmitting(true)
+        const job = props.editingJob
         try {
-            const cron =
-                form.scheduleType === "daily"
-                    ? cronFromSchedule("daily", form.dailyHour)
-                    : cronFromSchedule("hourly", form.hourlyInterval)
-
-            await createJob({
-                userId: DEFAULT_USER_ID,
-                name: form.name,
-                cronExpression: cron,
-                timezone: form.timezone,
-                prompt: form.prompt,
-                workspaceDir: props.workspaceDir,
-                config: {
-                    providerID: DEFAULT_PROVIDER,
-                    modelID: DEFAULT_MODEL,
-                },
-            })
-            showToast({ title: t("scheduler.create.success") })
-            setForm({ name: "", prompt: "" })
-            props.onCreated()
+            if (job) {
+                await updateJob(String(job.id), {
+                    name: form.name,
+                    cronExpression: buildCron(),
+                    timezone: form.timezone,
+                    prompt: form.prompt,
+                    config: picked(),
+                })
+                showToast({ title: t("scheduler.create.updateSuccess") })
+                resetForm()
+                props.onUpdated?.()
+            } else {
+                await createJob({
+                    userId: DEFAULT_USER_ID,
+                    name: form.name,
+                    cronExpression: buildCron(),
+                    timezone: form.timezone,
+                    prompt: form.prompt,
+                    workspaceDir: props.workspaceDir,
+                    config: picked(),
+                })
+                showToast({ title: t("scheduler.create.success") })
+                resetForm()
+                props.onCreated()
+            }
         } catch (err: any) {
-            showToast({ title: t("scheduler.create.failed"), description: err?.message || "未知错误" })
+            const key = job ? "scheduler.create.updateFailed" : "scheduler.create.failed"
+            showToast({ title: t(key as any), description: err?.message || "未知错误" })
         } finally {
             setSubmitting(false)
         }
@@ -95,18 +238,30 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
 
     return (
         <div class="flex flex-col gap-5 p-4">
-            {/* 任务名称 */}
-            <TextField
-                label={t("scheduler.create.name.label")}
-                placeholder={t("scheduler.create.name.placeholder")}
-                value={form.name}
-                onChange={(v) => setForm("name", v)}
-            />
+            <div class="flex flex-col gap-2">
+                <label class="text-12-medium text-text-strong" for="scheduler-create-name">
+                    {t("scheduler.create.name.label")}
+                </label>
+                <TextField
+                    id="scheduler-create-name"
+                    placeholder={t("scheduler.create.name.placeholder")}
+                    value={form.name}
+                    onChange={(v) => setForm("name", v)}
+                />
+            </div>
 
-            {/* 执行频率 */}
+            <div class="flex flex-col gap-2">
+                <label class="text-12-medium text-text-strong">{t("scheduler.create.model.label")}</label>
+                <ModelSelectorPopover model={modelState}>
+                    <Button variant="secondary" size="large" class="self-start">
+                        {modelLabel()}
+                    </Button>
+                </ModelSelectorPopover>
+            </div>
+
             <div class="flex flex-col gap-2">
                 <label class="text-12-medium text-text-strong">{t("scheduler.create.frequency.label")}</label>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
                     <Select
                         options={SCHEDULE_TYPES}
                         current={SCHEDULE_TYPES.find((s) => s.value === form.scheduleType)}
@@ -116,17 +271,7 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
                         size="large"
                         variant="secondary"
                     />
-                    <Show when={form.scheduleType === "daily"}>
-                        <Select
-                            options={HOURS}
-                            current={HOURS.find((h) => h.value === form.dailyHour)}
-                            value={(o) => String(o.value)}
-                            label={(o) => o.label}
-                            onSelect={(o) => o && setForm("dailyHour", o.value)}
-                            size="large"
-                            variant="secondary"
-                        />
-                    </Show>
+
                     <Show when={form.scheduleType === "hourly"}>
                         <Select
                             options={HOUR_INTERVALS}
@@ -137,38 +282,155 @@ function CreateJobTab(props: { onCreated: () => void; workspaceDir: string }) {
                             size="large"
                             variant="secondary"
                         />
+                        <Select
+                            options={MINUTES}
+                            current={MINUTES.find((m) => m.value === form.hourlyMinute)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("hourlyMinute", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                    </Show>
+
+                    <Show when={form.scheduleType === "daily"}>
+                        <Select
+                            options={HOURS}
+                            current={HOURS.find((h) => h.value === form.dailyHour)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("dailyHour", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                        <Select
+                            options={MINUTES}
+                            current={MINUTES.find((m) => m.value === form.dailyMinute)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("dailyMinute", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                    </Show>
+
+                    <Show when={form.scheduleType === "weekly"}>
+                        <Select
+                            options={WEEK_DAYS}
+                            current={WEEK_DAYS.find((d) => d.value === form.weeklyDay)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("weeklyDay", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                        <Select
+                            options={HOURS}
+                            current={HOURS.find((h) => h.value === form.weeklyHour)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("weeklyHour", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                        <Select
+                            options={MINUTES}
+                            current={MINUTES.find((m) => m.value === form.weeklyMinute)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("weeklyMinute", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                    </Show>
+
+                    <Show when={form.scheduleType === "monthly"}>
+                        <Select
+                            options={MONTH_DATES}
+                            current={MONTH_DATES.find((d) => d.value === form.monthlyDate)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("monthlyDate", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                        <Select
+                            options={HOURS}
+                            current={HOURS.find((h) => h.value === form.monthlyHour)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("monthlyHour", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
+                        <Select
+                            options={MINUTES}
+                            current={MINUTES.find((m) => m.value === form.monthlyMinute)}
+                            value={(o) => String(o.value)}
+                            label={(o) => o.label}
+                            onSelect={(o) => o && setForm("monthlyMinute", o.value)}
+                            size="large"
+                            variant="secondary"
+                        />
                     </Show>
                 </div>
             </div>
 
+            <div class="flex flex-col gap-2">
+                <label class="text-12-medium text-text-strong" for="scheduler-create-prompt">
+                    {t("scheduler.create.prompt.label")}
+                </label>
+                <TextField
+                    id="scheduler-create-prompt"
+                    placeholder={t("scheduler.create.prompt.placeholder")}
+                    value={form.prompt}
+                    onChange={(v) => setForm("prompt", v)}
+                    multiline
+                />
+            </div>
 
-            <TextField
-                label={t("scheduler.create.prompt.label")}
-                placeholder={t("scheduler.create.prompt.placeholder")}
-                value={form.prompt}
-                onChange={(v) => setForm("prompt", v)}
-                multiline
-            />
-
-            {/* 提交按钮 */}
-            <Button
-                variant="primary"
-                size="large"
-                onClick={handleSubmit}
-                disabled={submitting()}
-                class="self-end"
-            >
-                {submitting() ? t("scheduler.create.submitting") : t("scheduler.create.submit")}
-            </Button>
+            <div class="flex items-center gap-3 self-end">
+                <Show when={props.editingJob}>
+                    <Button
+                        variant="ghost"
+                        size="large"
+                        onClick={() => {
+                            resetForm()
+                            props.onCancelEdit?.()
+                        }}
+                        disabled={submitting()}
+                    >
+                        {t("scheduler.create.cancelEdit")}
+                    </Button>
+                </Show>
+                <Button
+                    variant="primary"
+                    size="large"
+                    onClick={handleSubmit}
+                    disabled={submitting()}
+                >
+                    <Show when={props.editingJob} fallback={submitting() ? t("scheduler.create.submitting") : t("scheduler.create.submit")}>
+                        {submitting() ? t("scheduler.create.updating") : t("scheduler.create.update")}
+                    </Show>
+                </Button>
+            </div>
         </div>
     )
 }
 
 // ── 任务列表 Tab ────────────────────────────────────
 
-function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
+function JobListTab(props: { refreshKey: () => number; workspaceDir: string; onEdit: (job: CronJob) => void }) {
     const { t } = useLanguage()
+    const models = useModels()
     const [filterStatus, setFilterStatus] = createSignal<string>("all")
+
+    const modelLabel = (cfg: CronJob["config"]) => {
+        if (!cfg?.providerID || !cfg?.modelID) return null
+        const found = models.find({ providerID: cfg.providerID, modelID: cfg.modelID })
+        if (found) return { provider: found.provider.name, model: found.name }
+        return { provider: cfg.providerID, model: cfg.modelID }
+    }
 
     const STATUS_OPTIONS = [
         { value: "all", label: t("scheduler.jobs.filter.all") },
@@ -278,6 +540,16 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                                                     class="text-text-weak hover:text-green-500 hover:bg-green-500/10"
                                                 />
                                             </Tooltip>
+                                            <Tooltip value={t("scheduler.jobs.action.edit")}>
+                                                <IconButton
+                                                    icon="pencil-line"
+                                                    variant="ghost"
+                                                    onClick={() => props.onEdit(job)}
+                                                    size="small"
+                                                    aria-label={t("scheduler.jobs.action.edit")}
+                                                    class="text-text-weak hover:text-interactive-base hover:bg-interactive-base/10"
+                                                />
+                                            </Tooltip>
                                             <Tooltip value={t("scheduler.jobs.action.delete")}>
                                                 <IconButton
                                                     icon="trash"
@@ -312,12 +584,27 @@ function JobListTab(props: { refreshKey: () => number; workspaceDir: string }) {
                                     </p>
                                 </div>
 
-                                <Show when={job.enabled && job.nextRun}>
-                                    <div class="flex items-center gap-1.5 text-11-regular text-text-weak/50 mt-1 pl-1">
-                                        <Icon name="clock" class="size-3 opacity-40" />
-                                        <span>{t("scheduler.jobs.nextRun", { time: new Date(job.nextRun!).toLocaleString() })}</span>
-                                    </div>
-                                </Show>
+                                <div class="flex items-center justify-between gap-2 pl-1">
+                                    <Show when={job.enabled && job.nextRun}>
+                                        <div class="flex items-center gap-1.5 text-11-regular text-text-weak/50">
+                                            <Icon name="clock" class="size-3 opacity-40" />
+                                            <span>{t("scheduler.jobs.nextRun", { time: new Date(job.nextRun!).toLocaleString() })}</span>
+                                        </div>
+                                    </Show>
+                                    <Show when={!job.enabled || !job.nextRun}>
+                                        <div />
+                                    </Show>
+                                    <Show when={modelLabel(job.config)}>
+                                        {(label) => (
+                                            <div class="flex items-center gap-1 text-11-regular text-text-weak/50 shrink-0">
+                                                <Icon name="brain" class="size-3 opacity-70" />
+                                                <span class="text-11-medium leading-none">
+                                                    {label().provider} · {label().model}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </Show>
+                                </div>
 
                             </div>
                         )}
@@ -477,33 +764,49 @@ function ExecutionHistoryTab(props: { workspaceDir: string }) {
 export const DialogScheduler: Component<{ currentDir: string }> = (props) => {
     const { t } = useLanguage()
     const [refreshKey, setRefreshKey] = createSignal(0)
+    const [editingJob, setEditingJob] = createSignal<CronJob | null>(null)
+    const [activeTab, setActiveTab] = createSignal("create")
 
     const handleCreated = () => {
         setRefreshKey((k) => k + 1)
     }
 
+    const handleUpdated = () => {
+        setEditingJob(null)
+        setRefreshKey((k) => k + 1)
+        setActiveTab("jobs")
+    }
+
+    const handleEdit = (job: CronJob) => {
+        setEditingJob(job)
+        setActiveTab("create")
+    }
+
+    const handleCancelEdit = () => {
+        setEditingJob(null)
+    }
+
     return (
         <Dialog title={t("scheduler.dialog.title")} size="x-large" transition>
-            <Tabs defaultValue="create" variant="pill" class="h-full">
+            <Tabs value={activeTab()} onChange={setActiveTab} variant="pill" class="h-full">
                 <Tabs.List class="px-4 pt-1">
                     <Tabs.Trigger value="create">
-                        <Icon name="plus-small" />
-                        {t("scheduler.tab.create")}
+                        {editingJob() ? t("scheduler.tab.edit") : t("scheduler.tab.create")}
                     </Tabs.Trigger>
-                    <Tabs.Trigger value="jobs">
-                        <Icon name="checklist" />
-                        {t("scheduler.tab.jobs")}
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="history">
-                        <Icon name="clock" />
-                        {t("scheduler.tab.history")}
-                    </Tabs.Trigger>
+                    <Tabs.Trigger value="jobs">{t("scheduler.tab.jobs")}</Tabs.Trigger>
+                    <Tabs.Trigger value="history">{t("scheduler.tab.history")}</Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content value="create" class="no-scrollbar overflow-y-auto">
-                    <CreateJobTab onCreated={handleCreated} workspaceDir={props.currentDir} />
+                    <CreateJobTab
+                        onCreated={handleCreated}
+                        workspaceDir={props.currentDir}
+                        editingJob={editingJob()}
+                        onUpdated={handleUpdated}
+                        onCancelEdit={handleCancelEdit}
+                    />
                 </Tabs.Content>
                 <Tabs.Content value="jobs" class="no-scrollbar overflow-y-auto">
-                    <JobListTab refreshKey={refreshKey} workspaceDir={props.currentDir} />
+                    <JobListTab refreshKey={refreshKey} workspaceDir={props.currentDir} onEdit={handleEdit} />
                 </Tabs.Content>
                 <Tabs.Content value="history" class="no-scrollbar overflow-y-auto">
                     <ExecutionHistoryTab workspaceDir={props.currentDir} />

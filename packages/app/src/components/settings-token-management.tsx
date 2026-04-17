@@ -146,11 +146,11 @@ const DEFAULT_CONFIG_TEMPLATE = `{
                 },
                 "TME DeepSeek-V3.1-Terminus": {
                     "name": "TME DeepSeek-V3.1-Terminus",
-                    "limit": { "context": 64000, "output": 32000 }
+                    "limit": { "context": 128000, "output": 32000 }
                 },
                 "TME DeepSeek-V3.2": {
                     "name": "TME DeepSeek-V3.2",
-                    "limit": { "context": 64000, "output": 32000 }
+                    "limit": { "context": 128000, "output": 32000 }
                 }
             }
         },
@@ -164,7 +164,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
             "models": {
                 "DeepSeek-V3.2": {
                     "name": "DeepSeek-V3.2",
-                    "limit": { "context": 64000, "output": 32000 }
+                    "limit": { "context": 128000, "output": 32000 }
                 },
                 "GLM-4.7": {
                     "name": "GLM-4.7",

@@ -57,18 +57,45 @@ export interface Execution {
 
 // ── Cron 表达式辅助 ──────────────────────────────────
 
-export type ScheduleType = "daily" | "hourly"
+export type ScheduleType = "hourly" | "daily" | "weekly" | "monthly"
 
-/**
- * 根据调度类型和值生成 cron 表达式
- * - daily + hour => "0 {hour} * * *"
- * - hourly + interval => "0 * /{interval} * * *"
- */
-export function cronFromSchedule(type: ScheduleType, value: number): string {
-    if (type === "daily") {
-        return `0 ${value} * * *`
+export type CronParams =
+    | { type: "hourly"; interval: number; minute: number }
+    | { type: "daily"; hour: number; minute: number }
+    | { type: "weekly"; day: number; hour: number; minute: number }
+    | { type: "monthly"; date: number; hour: number; minute: number }
+
+/** weekly `day`: 1=Mon … 7=Sun (maps Sun to 0 for cron) */
+export function cronFromSchedule(params: CronParams): string {
+    if (params.type === "hourly") {
+        return `${params.minute} */${params.interval} * * *`
     }
-    return `0 */${value} * * *`
+    if (params.type === "daily") {
+        return `${params.minute} ${params.hour} * * *`
+    }
+    if (params.type === "weekly") {
+        const dow = params.day === 7 ? 0 : params.day
+        return `${params.minute} ${params.hour} * * ${dow}`
+    }
+    return `${params.minute} ${params.hour} ${params.date} * *`
+}
+
+/** Reverse of cronFromSchedule — parses a cron string back into CronParams */
+export function parseCronToSchedule(cron: string): CronParams {
+    const [min, hr, dom, , dow] = cron.trim().split(" ")
+    const minute = Number(min)
+    if (hr.startsWith("*/")) {
+        return { type: "hourly", interval: Number(hr.slice(2)), minute }
+    }
+    const hour = Number(hr)
+    if (dom === "*" && dow === "*") {
+        return { type: "daily", hour, minute }
+    }
+    if (dom === "*") {
+        const day = Number(dow) === 0 ? 7 : Number(dow)
+        return { type: "weekly", day, hour, minute }
+    }
+    return { type: "monthly", date: Number(dom), hour, minute }
 }
 
 // ── API 函数 ─────────────────────────────────────────
@@ -112,11 +139,22 @@ export async function getJob(id: string): Promise<CronJob> {
 }
 
 export async function createJob(data: CreateJobInput): Promise<CronJob> {
+    // eslint-disable-next-line no-console
+    console.log("[createJob] Request body:", JSON.stringify(data, null, 2))
     const res = await request<ApiResponse<CronJob>>("/api/jobs", {
         method: "POST",
         body: JSON.stringify(data),
     })
     if (!res.item) throw new Error("Failed to create job")
+    return res.item
+}
+
+export async function updateJob(id: string, data: Partial<CreateJobInput> & { enabled?: boolean }): Promise<CronJob> {
+    const res = await request<ApiResponse<CronJob>>(`/api/jobs/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    })
+    if (!res.item) throw new Error("Failed to update job")
     return res.item
 }
 
