@@ -57,6 +57,7 @@ import { ToolStatusTitle } from "./tool-status-title"
 import { animate } from "motion"
 import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
+import { DataTable } from "./datatable"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -2356,6 +2357,52 @@ function EChartsRenderer(props: { data: string }) {
   )
 }
 
+function SqlQueryRenderer(props: { data: string }) {
+  const parsed = createMemo(() => {
+    try {
+      return JSON.parse(props.data) as {
+        success?: boolean
+        message?: string
+        data?: {
+          result_msg?: string
+          result?: {
+            rows?: unknown[]
+            columns?: unknown[]
+          }
+        }
+      }
+    } catch (e) {
+      return { success: false, message: `JSON parse error: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  const cols = createMemo(() => {
+    const list = parsed().data?.result?.columns
+    if (!Array.isArray(list)) return []
+    return list.filter((item): item is { name?: string; dataType?: string } => typeof item === "object" && item !== null)
+  })
+
+  const rows = createMemo(() => {
+    const list = parsed().data?.result?.rows
+    if (!Array.isArray(list)) return []
+    return list.filter(Array.isArray)
+  })
+
+  const err = createMemo(() => parsed().message || parsed().data?.result_msg || "Unknown error")
+
+  return (
+    <Show when={parsed().success} fallback={<div data-slot="mcp-sql-error">{err()}</div>}>
+      <Show when={cols().length > 0} fallback={<div data-slot="mcp-tool-no-results">No table schema</div>}>
+        <DataTable
+          cols={cols().map((item) => ({ key: item.name || "-", label: item.name || "-", title: item.dataType || "" }))}
+          rows={rows()}
+          empty="No rows"
+        />
+      </Show>
+    </Show>
+  )
+}
+
 function McpTabsTool(props: ToolProps & { inputName?: string; inputContent: string }) {
   const i18n = useI18n()
   const fileComponent = useFileComponent()
@@ -2450,16 +2497,7 @@ ToolRegistry.register({
             <Tabs.Content value="output">
               <div data-slot="mcp-sql-tabs-content">
                 <Show when={props.output} fallback={<div data-slot="mcp-tool-no-results">{i18n.t("ui.tool.mcp.run_query.no_results")}</div>}>
-                  <Dynamic
-                    component={fileComponent}
-                    mode="text"
-                    file={{
-                      name: "output.json",
-                      contents: props.output!,
-                      cacheKey: checksum(props.output!),
-                    }}
-                    overflow="scroll"
-                  />
+                  {(output) => <SqlQueryRenderer data={output()} />}
                 </Show>
               </div>
             </Tabs.Content>

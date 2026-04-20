@@ -222,7 +222,7 @@ export function FileTabContent(props: { tab: string }) {
   const isExcel = createMemo(() => {
     const p = path()
     if (!p) return false
-    return /\.(xlsx?|xlsm|xlsb|csv)$/i.test(p)
+    return /\.(xlsx?|xlsm|xlsb)$/i.test(p)
   })
   const isMd = createMemo(() => /\.md$/i.test(path() ?? ""))
   const [preview, setPreview] = createSignal(false)

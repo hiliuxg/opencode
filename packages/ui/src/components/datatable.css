@@ -1,0 +1,43 @@
+[data-component="datatable-wrap"] {
+  overflow: auto;
+  position: relative;
+}
+
+[data-slot="datatable-copy"] {
+  position: sticky;
+  top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+  margin-left: auto;
+  z-index: 2;
+}
+
+[data-component="datatable"] {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-small);
+  font-family: var(--font-family-mono);
+
+  th,
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-default);
+    text-align: left;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-base);
+    z-index: 1;
+    color: var(--text-strong);
+    font-weight: var(--font-weight-medium);
+  }
+
+  td {
+    color: var(--text-default);
+  }
+}

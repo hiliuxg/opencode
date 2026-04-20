@@ -1284,6 +1284,15 @@
   word-break: break-word;
 }
 
+[data-slot="mcp-sql-error"] {
+  padding: 12px;
+  color: var(--text-on-critical-base);
+  background: var(--surface-critical-weak);
+  border-radius: 6px;
+  font-size: 13px;
+  word-break: break-word;
+}
+
 [data-component="tool-loaded-file"] {
   display: flex;
   align-items: center;

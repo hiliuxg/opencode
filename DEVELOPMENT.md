@@ -218,7 +218,8 @@ opencode-app-2251:latest
 # 上一个版本 opencode-v125-03282001 45f94d09e8a3
 # 上一个版本 45f94d09e8a3   opencode-v125-03282001 
 # 上一个版本 opencode-v1313-04101052
-#  opencode-v1313-04142202
+# opencode-v1313-04142202
+# opencode-v1313-04171259
 
 
 # 前端构建
@@ -235,13 +236,13 @@ export OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB
 OPENCODE_CHANNEL=latest OPENCODE_VERSION=1.3.13 ./packages/opencode/script/build.ts
 
 docker buildx build --platform linux/amd64 \
-      -t opencode-v1313-04171259 \
+      -t opencode-v1313-04202355 \
       --load \
       . 
 
-docker save -o opencode-v1313-04171259.tar opencode-v1313-04171259
+docker save -o opencode-v1313-04202355.tar opencode-v1313-04202355
 
-sudo docker load -i opencode-v1313-04171259.tar
+sudo docker load -i opencode-v1313-04202355.tar
   
   
 sudo docker run  -d \
@@ -258,10 +259,8 @@ sudo docker run  -d \
   -v /data1/opencode:/home \
   -v /data1/opencode/base-1333/config:/root/.config/opencode \
   -v /data1/opencode/base-1333/local:/root/.local \
-  opencode-v1313-04171259 \
+  opencode-v1313-04202355 \
   --print-logs serve --hostname 0.0.0.0 --cors * --log-level INFO  
-
-
 
 docker exec -it 3f38319046be  /bin/sh
 
