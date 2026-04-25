@@ -1,45 +1,66 @@
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { tool } from "@opencode-ai/plugin"
+import path from "path"
 
-/** 与 kudata-mcp.ts 同目录：dir_account 超管（*）或 skill_name → 允许的 dir_account 列表 */
-const ACCOUNT_SKILL_PERMISSIONS_FILE = join(dirname(fileURLToPath(import.meta.url)), "account-skill-permissions.json")
+/** 超级管理员账号列表 */
+const SUPER_ADMINS = new Set([
+  "xuegangyu",
+  "zeluswu",
+  "shenyuanli",
+  "marioji",
+  "xiaogenliu",
+  "janeyang",
+  "ceo",
+  "markxie",
+  "cussionpang",
+  "ross",
+  "darrenfu"
+])
 
-async function loadAccountSkillPermissions(): Promise<
-  { ok: true; data: Record<string, "*" | string[]> } | { ok: false; message: string }
-> {
-  const f = Bun.file(ACCOUNT_SKILL_PERMISSIONS_FILE)
-  if (!(await f.exists()))
-    return {
-      ok: false,
-      message: `权限配置加载失败: 未找到文件 ${ACCOUNT_SKILL_PERMISSIONS_FILE}`,
-    }
-  let raw: unknown
+/** 查询用户的可访问 skills 列表 */
+async function fetchUserSkills(dir_account: string): Promise<{ ok: true; skills: string[] } | { ok: false; message: string }> {
   try {
-    raw = await f.json()
-  } catch {
-    return {
-      ok: false,
-      message: `权限配置加载失败: JSON 解析错误 (${ACCOUNT_SKILL_PERMISSIONS_FILE})`,
-    }
+    const res = await fetch(
+      `http://10.5.132.186:8000/open-api/skills/accessible?username=${encodeURIComponent(dir_account)}`,
+      { headers: { "X-API-Key": "O_10GPaDxKEzpkZNwT8HIVwsxgcT4Cpgox3LWU7DGxM" } }
+    )
+    if (!res.ok) return { ok: false, message: `获取用户 skills 失败: HTTP ${res.status}` }
+    const data = await res.json() as { username: string; skills: string[] }
+    if (!Array.isArray(data.skills)) return { ok: false, message: "获取用户 skills 失败: 返回格式错误" }
+    return { ok: true, skills: data.skills }
+  } catch (err) {
+    return { ok: false, message: `获取用户 skills 失败: ${err instanceof Error ? err.message : String(err)}` }
   }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
-    return { ok: false, message: "权限配置加载失败: 根节点必须是对象" }
-  return { ok: true, data: raw as Record<string, "*" | string[]> }
 }
 
-function resolveSqlFinalAccount(
-  perms: Record<string, "*" | string[]>,
+/** 解析 SQL 执行的最终账号 */
+async function resolveSqlFinalAccount(
   dir_account: string,
   account: string,
-  skill_name: string,
-): { final_account: string } | { error: string } {
-  const wildcard = perms[dir_account]
-  if (wildcard === "*") return { final_account: account }
+  skill_name: string | undefined | null,
+): Promise<{ final_account: string } | { error: string }> {
+  // 规则 1: 如果 dir_account = account，则直接执行 SQL，忽略 skill
   if (dir_account === account) return { final_account: account }
-  const allowed = perms[skill_name]
-  if (Array.isArray(allowed) && allowed.includes(dir_account)) return { final_account: account }
-  return { error: `权限校验失败: ${dir_account} 没有 ${skill_name} 权限` }
+
+  // 规则 2: 如果 dir_account 是超级管理员，则使用 account
+  if (SUPER_ADMINS.has(dir_account)) return { final_account: account }
+
+  // 规则 3: 如果不是超管，继续判断
+  // 如果 skill_name 为空值，则使用 dir_account
+  if (!skill_name || skill_name.trim() === "") return { final_account: dir_account }
+
+  // 如果 skill_name 不为空，查询用户的 skills 列表
+  const result = await fetchUserSkills(dir_account)
+  if (!result.ok) return { error: result.message }
+
+  // 检查用户是否有该 skill 权限
+  if (!result.skills.includes(skill_name)) {
+    return {
+      error: `权限校验失败: ${dir_account} 没有 ${skill_name} 权限，请前往 https://kudata-agent.tmeoa.com/skill-market 申请权限`
+    }
+  }
+
+  // 用户有该 skill 权限，使用 account
+  return { final_account: account }
 }
 
 export const sql_query_result = tool({
@@ -49,7 +70,7 @@ export const sql_query_result = tool({
     cluster: tool.schema.string().describe("必填，集群名称, 可选值: bi-cloud, realtime"),
     account: tool.schema.string().describe("必填，sql执行账号名称"),
     query: tool.schema.string().describe("必填，sql to query"),
-    skill_name: tool.schema.string().describe("必填，技能名称，sql是基于哪个skill生成的")
+    skill_name: tool.schema.string().optional().describe("选填，技能名称，sql是基于哪个skill生成的")
   },
   async execute(args, context) {
     try {
@@ -74,9 +95,7 @@ export const sql_query_result = tool({
         query,
       )
 
-      const loaded = await loadAccountSkillPermissions()
-      if (!loaded.ok) return loaded.message
-      const auth = resolveSqlFinalAccount(loaded.data, dir_account, account, skill_name)
+      const auth = await resolveSqlFinalAccount(dir_account, account, skill_name)
       if ("error" in auth) return auth.error
       const final_account = auth.final_account
 
@@ -172,9 +191,9 @@ export const send_message = tool({
     console.log(`[Debug] directory: ${directory}, base64: ${directoryBase64}`);
     console.log(`[Debug] session_url: ${session_url}`);
 
-    let finalContent = `${content}\n[推理过程](${session_url})`;
+    let finalContent = `${content}`;
     if (file_url) {
-      finalContent += ` | [数据报告](${file_url})`;
+      finalContent += `[数据报告](${file_url})`;
     }
 
     console.log(`[Debug] finalContent: ${finalContent}`);
@@ -236,9 +255,9 @@ export const send_message = tool({
 
 
 export const render_chart = tool({
-  description: "渲染二维图表，只支持柱状图、折线图，其他类型不支持",
+  description: "渲染二维图表，只支持bar(柱状图)、line(折线图)，其他类型不支持",
   args: {
-    chart_type: tool.schema.string().describe("图表类型，可选值为 'bar'（柱状图）、'line'（折线图）"),
+    chart_type: tool.schema.string().describe("图表类型，可选值为 'bar'、'line'"),
     title: tool.schema.string().describe("图表标题"),
     series: tool.schema.array(tool.schema.json()).describe('数据值系列，JSON数组类型，每个item必须包含 `name`和`data` key，`name`为系列名，`data`为数据值数组，格式如：[{"name": "系列名1", "data": [1, 2, 3]}, {"name": "系列名2", "data": [4, 5, 6]}]'),
     xAxis: tool.schema.array(tool.schema.string()).optional().describe('X轴标签列表，数组类型，通常为日期，例如 ["2026-01-02", "2026-01-03", "2026-01-04"]'),
@@ -248,7 +267,7 @@ export const render_chart = tool({
       console.log("render_chart_args=", args)
       const series = typeof args.series === 'string' ? JSON.parse(args.series) : args.series
       if (!Array.isArray(series))
-        return JSON.stringify({ success: false, message: 'series 必须是JSON数组类型，每个item必须包含 `name`和`data` key，`name`为系列名，`data`为数据值数组，格式如：[{"name": "系列名1","data": [1,2, 3]}, {"name": "系列名2", "data": [4, 5, 6]}]' })
+        return JSON.stringify({ success: false, message: 'series 必须是JSON数组类型，每个item必须包含 `name`和`data` key，`name`为系列名，`data`为数据值数组，格式如：[{"name": "系列名1","data": [1, 2, 3]}, {"name": "系列名2", "data": [4, 5, 6]}]' })
 
       const xAxis = args.xAxis;
       if (xAxis !== undefined && xAxis !== null && !Array.isArray(xAxis))
@@ -271,6 +290,55 @@ export const render_chart = tool({
     }
   }
 });
+
+export const get_file_link = tool({
+  description: "获取文件链接，可生成下载链接或共享链接",
+  args: {
+    type: tool.schema.enum(["share", "download"]).describe("链接类型，share 为共享链接，download 为下载链接"),
+    filepath: tool.schema.string().describe("文件路径，建议传绝对路径"),
+    filePath: tool.schema.string().optional().describe("兼容字段，等同 filepath"),
+  },
+  async execute(args, context) {
+    try {
+      const raw = args.filepath || args.filePath
+      if (!raw) return JSON.stringify({ success: false, message: "filepath 不能为空" })
+
+      const filepath = path.isAbsolute(raw) ? raw : path.join(context.directory, raw)
+      const rel = path.relative(context.directory, filepath)
+      if (rel.startsWith("..") || path.isAbsolute(rel)) {
+        return JSON.stringify({ success: false, message: "文件路径不在当前工作目录内" })
+      }
+
+      const file = Bun.file(filepath)
+      if (!(await file.exists())) {
+        return JSON.stringify({ success: false, message: `文件不存在: ${filepath}` })
+      }
+
+      if (args.type === "download") {
+        const link = `https://kudata-agent.tmeoa.com/kgbi/starbot/file/download?path=${encodeURIComponent(rel.replaceAll("\\", "/"))}&directory=${encodeURIComponent(context.directory)}`
+        return JSON.stringify({ success: true, type: "download", filepath, link })
+      }
+
+      const form = new FormData()
+      form.append("file", file, path.basename(filepath))
+      const resp = await fetch("http://10.5.132.186:8000/api/v1/report-html/upload", {
+        method: "POST",
+        body: form,
+      })
+      if (!resp.ok) return JSON.stringify({ success: false, message: `上传失败: HTTP ${resp.status}` })
+
+      const json = await resp.json() as { url?: string; data?: { url?: string } }
+      let link = json.url ?? json.data?.url ?? ""
+      if (!link) return JSON.stringify({ success: false, message: "上传成功但未返回链接" })
+      if (link.startsWith("/")) link = `https://kudata-agent.tmeoa.com${link}`
+
+      return JSON.stringify({ success: true, type: "share", filepath, link })
+    } catch (e) {
+      console.error("get_file_link error:", e)
+      return JSON.stringify({ success: false, message: e instanceof Error ? e.message : String(e) })
+    }
+  },
+})
 
 export const manage_schedule = tool({
   description: "管理定时任务，当用户提到定时推送分析报告等定时任务时，使用此工具。",
@@ -301,7 +369,7 @@ export const manage_schedule = tool({
             cronExpression: args.schedule,
             prompt: args.prompt,
             workspaceDir: context.directory,
-            config: { providerID: "tme-continue-provider", modelID: "Gemini-3.1-Pro" },
+            config: { providerID: "kudata-provider", modelID: "kimi-k2.5" },
           }),
         })
         const data = await res.json()

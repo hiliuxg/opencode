@@ -73,6 +73,7 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} 次搜索",
   "ui.messagePart.context.list.one": "{{count}} 个列表",
   "ui.messagePart.context.list.other": "{{count}} 个列表",
+  "ui.messagePart.sql.limit": "当前共返回 {{total}} 条，仅显示前 {{limit}} 条。",
   "ui.messagePart.diagnostic.error": "错误",
   "ui.messagePart.title.edit": "编辑",
   "ui.messagePart.title.write": "写入",
@@ -136,7 +137,10 @@ export const dict = {
   "ui.message.revertMessage": "重置到此点",
   "ui.message.copyResponse": "复制回复",
   "ui.message.copied": "已复制！",
+  "ui.message.download": "下载 Excel",
+  "ui.message.downloaded": "已下载",
   "ui.message.interrupted": "已中断",
+  "ui.message.feedback": "反馈",
   "ui.message.queued": "排队中",
   "ui.message.attachment.alt": "附件",
 

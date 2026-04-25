@@ -34,7 +34,6 @@ export function NewSessionView(props: NewSessionViewProps) {
     if (!project) return false
     return sdk.directory !== project.worktree
   })
-  console.log("isWorktree", isWorktree)
 
   const label = (value: string) => {
     if (value === MAIN_WORKTREE) {

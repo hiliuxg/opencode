@@ -1,16 +1,33 @@
 [data-component="datatable-wrap"] {
-  overflow: auto;
   position: relative;
+}
+
+[data-slot="datatable-head"] {
+  margin: 5px 5px 0;
 }
 
 [data-slot="datatable-copy"] {
   position: sticky;
-  top: 8px;
+  top: 5px;
+  right: 5px;
   display: flex;
+  gap: 4px;
   justify-content: flex-end;
-  margin-bottom: 4px;
-  margin-left: auto;
+  margin: 5px 5px 0 auto;
   z-index: 2;
+
+  [data-component="icon-button"] {
+    cursor: pointer;
+  }
+
+  [data-component="icon-button"]:disabled {
+    cursor: not-allowed;
+  }
+}
+
+[data-slot="datatable-body"] {
+  overflow: auto;
+  margin: 5px;
 }
 
 [data-component="datatable"] {

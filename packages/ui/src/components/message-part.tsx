@@ -59,6 +59,8 @@ import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
 import { DataTable } from "./datatable"
 
+const SQL_ROWS = 120
+
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
   let valueRef: HTMLSpanElement | undefined
@@ -1429,6 +1431,15 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleFeedback = () => {
+    if (props.message.role !== "assistant") return
+    const message = props.message as AssistantMessage
+    const sessionID = message.sessionID
+    const messageID = message.id
+    const url = `https://kudata-agent.tmeoa.com/reportview/feedback?platform=opencode&round_id=${sessionID}+${messageID}`
+    window.open(url, "_blank")
+  }
+
   return (
     <Show when={throttledText()}>
       <div data-component="text-part">
@@ -1449,6 +1460,16 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleCopy}
                 aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+              />
+            </Tooltip>
+            <Tooltip value={i18n.t("ui.message.feedback")} placement="top" gutter={4}>
+              <IconButton
+                icon="open-file"
+                size="normal"
+                variant="ghost"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleFeedback}
+                aria-label={i18n.t("ui.message.feedback")}
               />
             </Tooltip>
             <Show when={meta()}>
@@ -2358,11 +2379,13 @@ function EChartsRenderer(props: { data: string }) {
 }
 
 function SqlQueryRenderer(props: { data: string }) {
+  const i18n = useI18n()
   const parsed = createMemo(() => {
     try {
       return JSON.parse(props.data) as {
         success?: boolean
         message?: string
+        parsed?: true
         data?: {
           result_msg?: string
           result?: {
@@ -2371,8 +2394,13 @@ function SqlQueryRenderer(props: { data: string }) {
           }
         }
       }
-    } catch (e) {
-      return { success: false, message: `JSON parse error: ${e instanceof Error ? e.message : String(e)}` }
+    } catch {
+      return {
+        success: false,
+        parsed: false as const,
+        message: undefined,
+        data: undefined,
+      }
     }
   })
 
@@ -2388,16 +2416,39 @@ function SqlQueryRenderer(props: { data: string }) {
     return list.filter(Array.isArray)
   })
 
+  const total = createMemo(() => rows().length)
+  const limited = createMemo(() => rows().slice(0, SQL_ROWS))
+
   const err = createMemo(() => parsed().message || parsed().data?.result_msg || "Unknown error")
 
   return (
-    <Show when={parsed().success} fallback={<div data-slot="mcp-sql-error">{err()}</div>}>
+    <Show
+      when={parsed().parsed !== false}
+      fallback={
+        <pre data-slot="mcp-sql-error" class="m-0 whitespace-pre-wrap break-words">
+          {props.data}
+        </pre>
+      }
+    >
+      <Show when={parsed().success} fallback={<div data-slot="mcp-sql-error">{err()}</div>}>
       <Show when={cols().length > 0} fallback={<div data-slot="mcp-tool-no-results">No table schema</div>}>
         <DataTable
+          head={
+            <Show when={total() > SQL_ROWS}>
+              <div data-slot="mcp-sql-limit">
+                {i18n.t("ui.messagePart.sql.limit", {
+                  limit: SQL_ROWS,
+                  total: total(),
+                })}
+              </div>
+            </Show>
+          }
           cols={cols().map((item) => ({ key: item.name || "-", label: item.name || "-", title: item.dataType || "" }))}
-          rows={rows()}
+          rows={limited()}
+          file="sql-result.xlsx"
           empty="No rows"
         />
+      </Show>
       </Show>
     </Show>
   )

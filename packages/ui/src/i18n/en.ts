@@ -75,6 +75,7 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} searches",
   "ui.messagePart.context.list.one": "{{count}} list",
   "ui.messagePart.context.list.other": "{{count}} lists",
+  "ui.messagePart.sql.limit": "Showing only the first {{limit}} rows out of {{total}} total rows.",
 
   "ui.list.loading": "Loading",
   "ui.list.empty": "No results",
@@ -153,9 +154,12 @@ export const dict: Record<string, string> = {
   "ui.message.revertMessage": "Revert message",
   "ui.message.copyResponse": "Copy response",
   "ui.message.copied": "Copied",
+  "ui.message.download": "Download Excel",
+  "ui.message.downloaded": "Downloaded",
   "ui.message.duration.seconds": "{{count}}s",
   "ui.message.duration.minutesSeconds": "{{minutes}}m {{seconds}}s",
   "ui.message.interrupted": "Interrupted",
+  "ui.message.feedback": "Feedback",
   "ui.message.queued": "Queued",
   "ui.message.attachment.alt": "attachment",
 
