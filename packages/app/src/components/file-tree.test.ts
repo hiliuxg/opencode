@@ -26,8 +26,19 @@ beforeAll(async () => {
       Content: (props: { children?: unknown }) => props.children,
     },
   }))
+  mock.module("@opencode-ai/ui/context-menu", () => ({
+    ContextMenu: Object.assign((props: { children?: unknown }) => props.children, {
+      Trigger: (props: { children?: unknown }) => props.children,
+      Portal: (props: { children?: unknown }) => props.children,
+      Content: (props: { children?: unknown }) => props.children,
+      Item: (props: { children?: unknown }) => props.children,
+      ItemLabel: (props: { children?: unknown }) => props.children,
+      Separator: () => null,
+    }),
+  }))
   mock.module("@opencode-ai/ui/file-icon", () => ({ FileIcon: () => null }))
   mock.module("@opencode-ai/ui/icon", () => ({ Icon: () => null }))
+  mock.module("@opencode-ai/ui/toast", () => ({ showToast: () => undefined }))
   mock.module("@opencode-ai/ui/tooltip", () => ({ Tooltip: (props: { children?: unknown }) => props.children }))
   const mod = await import("./file-tree")
   shouldListRoot = mod.shouldListRoot
@@ -74,5 +85,17 @@ describe("file tree fetch discipline", () => {
 
     expect(second).toEqual([])
     expect(dirsToExpand({ level: 1, filter, expanded: () => false })).toEqual([])
+  })
+
+  test("active file auto-expand picks parent dirs", () => {
+    const expanded = new Set(["src"])
+
+    expect(
+      dirsToExpand({
+        level: 0,
+        active: "src/components/file-tree.tsx",
+        expanded: (dir) => expanded.has(dir),
+      }),
+    ).toEqual(["src/components"])
   })
 })

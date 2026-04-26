@@ -43,8 +43,14 @@ export function trimSessions(
   const roots = all.filter((s) => !s.parentID)
   const children = all.filter((s) => !!s.parentID)
   const base = roots.slice(0, limit)
+  const pin = roots.filter((s) => !!s.time?.pinned)
   const recent = takeRecentSessions(roots.slice(limit), SESSION_RECENT_LIMIT, cutoff)
-  const keepRoots = [...base, ...recent]
+  const seen = new Set<string>()
+  const keepRoots = [...base, ...pin, ...recent].filter((s) => {
+    if (seen.has(s.id)) return false
+    seen.add(s.id)
+    return true
+  })
   const keepRootIds = new Set(keepRoots.map((s) => s.id))
   const keepChildren = children.filter((s) => {
     if (s.parentID && keepRootIds.has(s.parentID)) return true

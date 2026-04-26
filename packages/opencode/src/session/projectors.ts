@@ -41,6 +41,7 @@ export function toPartialRow(info: DeepPartial<Session.Info>) {
     project_id: grab(info, "projectID"),
     workspace_id: grab(info, "workspaceID"),
     parent_id: grab(info, "parentID"),
+    catalog_id: grab(info, "catalogID"),
     slug: grab(info, "slug"),
     directory: grab(info, "directory"),
     title: grab(info, "title"),
@@ -56,6 +57,7 @@ export function toPartialRow(info: DeepPartial<Session.Info>) {
     time_updated: grab(info, "time", (v) => grab(v, "updated")),
     time_compacting: grab(info, "time", (v) => grab(v, "compacting")),
     time_archived: grab(info, "time", (v) => grab(v, "archived")),
+    time_pinned: grab(info, "time", (v) => grab(v, "pinned")),
   }
 
   return Object.fromEntries(Object.entries(obj).filter(([_, val]) => val !== undefined))

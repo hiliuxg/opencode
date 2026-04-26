@@ -167,6 +167,11 @@ export function SessionSidePanel(props: {
   const openedTabs = tabState.openedTabs
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
+  const path = createMemo(() => {
+    const tab = activeFileTab()
+    if (!tab) return
+    return file.pathFromTab(tab)
+  })
 
   const fileTreeTab = () => layout.fileTree.tab()
 
@@ -708,6 +713,7 @@ export function SessionSidePanel(props: {
                             class="pt-3"
                             modified={diffFiles()}
                             kinds={kinds()}
+                            active={path()}
                             onFileClick={(node) => openTab(file.tab(node.path))}
                             ops={fileTreeOps}
                           />

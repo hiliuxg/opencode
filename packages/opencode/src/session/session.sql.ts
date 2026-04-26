@@ -4,12 +4,33 @@ import type { MessageV2 } from "./message-v2"
 import type { Snapshot } from "../snapshot"
 import type { Permission } from "../permission"
 import type { ProjectID } from "../project/schema"
-import type { SessionID, MessageID, PartID } from "./schema"
+import type { SessionID, SessionCatalogID, MessageID, PartID } from "./schema"
 import type { WorkspaceID } from "../control-plane/schema"
 import { Timestamps } from "../storage/schema.sql"
 
 type PartData = Omit<MessageV2.Part, "id" | "sessionID" | "messageID">
 type InfoData = Omit<MessageV2.Info, "id" | "sessionID">
+
+export const SessionCatalogTable = sqliteTable(
+  "session_catalog",
+  {
+    id: text().$type<SessionCatalogID>().primaryKey(),
+    project_id: text()
+      .$type<ProjectID>()
+      .notNull()
+      .references(() => ProjectTable.id, { onDelete: "cascade" }),
+    directory: text().notNull(),
+    key: text().$type<"temp" | "analysis" | "notes" | "archived">(),
+    name: text().notNull(),
+    icon: text().notNull(),
+    sort: integer().notNull(),
+    ...Timestamps,
+  },
+  (table) => [
+    index("session_catalog_project_directory_idx").on(table.project_id, table.directory),
+    index("session_catalog_project_directory_sort_idx").on(table.project_id, table.directory, table.sort),
+  ],
+)
 
 export const SessionTable = sqliteTable(
   "session",
@@ -21,6 +42,9 @@ export const SessionTable = sqliteTable(
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
     workspace_id: text().$type<WorkspaceID>(),
     parent_id: text().$type<SessionID>(),
+    catalog_id: text()
+      .$type<SessionCatalogID>()
+      .references(() => SessionCatalogTable.id, { onDelete: "set null" }),
     slug: text().notNull(),
     directory: text().notNull(),
     title: text().notNull(),
@@ -35,11 +59,14 @@ export const SessionTable = sqliteTable(
     ...Timestamps,
     time_compacting: integer(),
     time_archived: integer(),
+    time_pinned: integer(),
   },
   (table) => [
     index("session_project_idx").on(table.project_id),
     index("session_workspace_idx").on(table.workspace_id),
     index("session_parent_idx").on(table.parent_id),
+    index("session_catalog_idx").on(table.catalog_id),
+    index("session_pinned_idx").on(table.time_pinned),
   ],
 )
 

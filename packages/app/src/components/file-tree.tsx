@@ -57,11 +57,17 @@ export function shouldListExpanded(input: {
 export function dirsToExpand(input: {
   level: number
   filter?: { dirs: Set<string> }
+  active?: string
   expanded: (dir: string) => boolean
 }) {
   if (input.level !== 0) return []
-  if (!input.filter) return []
-  return [...input.filter.dirs].filter((dir) => !input.expanded(dir))
+  const dirs = new Set(input.filter?.dirs)
+  const parts = input.active?.replace(/[\\/]+$/, "").replaceAll("\\", "/").split("/").slice(0, -1) ?? []
+  for (const [idx] of parts.entries()) {
+    const dir = parts.slice(0, idx + 1).join("/")
+    if (dir) dirs.add(dir)
+  }
+  return [...dirs].filter((dir) => !input.expanded(dir))
 }
 
 const kindLabel = (kind: Kind) => {
@@ -286,6 +292,7 @@ export default function FileTree(props: {
       .normalize(p)
       .replace(/[\\/]+$/, "")
       .replaceAll("\\", "/")
+  const active = createMemo(() => (props.active ? key(props.active) : undefined))
   const chain = props._chain ? [...props._chain, key(props.path)] : [key(props.path)]
 
   const [editing, setEditing] = createSignal<{ path: string; type: "rename" | "newFile" | "newFolder" } | null>(null)
@@ -379,6 +386,7 @@ export default function FileTree(props: {
     const dirs = dirsToExpand({
       level,
       filter: current,
+      active: active(),
       expanded: (dir) => untrack(() => file.tree.state(dir)?.expanded) ?? false,
     })
     for (const dir of dirs) file.tree.expand(dir)
@@ -638,7 +646,7 @@ export default function FileTree(props: {
     <FileTreeNode
       node={node}
       level={level}
-      active={props.active}
+      active={active()}
       nodeClass={props.nodeClass}
       draggable={draggable()}
       kinds={kinds()}
@@ -677,7 +685,7 @@ export default function FileTree(props: {
           <FileTreeNode
             node={node}
             level={level}
-            active={props.active}
+            active={active()}
             nodeClass={props.nodeClass}
             draggable={draggable()}
             kinds={kinds()}

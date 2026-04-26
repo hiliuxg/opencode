@@ -92,6 +92,7 @@ import {
 } from "./layout/sidebar-workspace"
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { SidebarContent } from "./layout/sidebar-shell"
+import { ConversationSidebar } from "./layout/conversation-sidebar"
 
 export default function Layout(props: ParentProps) {
   const [store, setStore, , ready] = persisted(
@@ -1066,7 +1067,7 @@ export default function Layout(props: ParentProps) {
     }
   }
 
-  async function archiveSession(session: Session) {
+  async function archiveSession(session: Session, input?: { catalogID?: string; pinned?: boolean }) {
     const [store, setStore] = globalSync.child(session.directory)
     const sessions = store.session ?? []
     const index = sessions.findIndex((s) => s.id === session.id)
@@ -1075,6 +1076,8 @@ export default function Layout(props: ParentProps) {
     await globalSDK.client.session.update({
       directory: session.directory,
       sessionID: session.id,
+      catalogID: input?.catalogID,
+      pinned: input?.pinned,
       time: { archived: Date.now() },
     })
     setStore(
@@ -1978,6 +1981,22 @@ export default function Layout(props: ParentProps) {
     return [...ordered, extra]
   }
 
+  const peekDirs = createMemo(() => {
+    const project = peekProject()
+    if (!project) return [] as string[]
+    if (project.vcs !== "git") return [project.worktree]
+    if (!layout.sidebar.workspaces(project.worktree)()) return [project.worktree]
+    return workspaceIds(project)
+  })
+
+  const peekSessions = createMemo(() => {
+    const now = sortNow()
+    return peekDirs().flatMap((directory) => {
+      const [store] = globalSync.child(directory, { bootstrap: true })
+      return sortedRootSessions(store, now)
+    })
+  })
+
   const sidebarProject = createMemo(() => {
     if (layout.sidebar.opened()) return currentProject()
     const hovered = hoverProjectData()
@@ -2471,9 +2490,27 @@ export default function Layout(props: ParentProps) {
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
       onOpenHelp={() => platform.openLink("https://opencode.ai/desktop-feedback")}
-      renderPanel={() =>
-        mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
-      }
+      renderPanel={() => (
+        <ConversationSidebar
+          project={currentProject}
+          sessions={currentSessions}
+          dirs={visibleSessionDirs}
+          currentDir={currentDir}
+          width={panel}
+          now={sortNow}
+          merged={() => true}
+          hovering={sidebarHovering}
+          mobile={mobile}
+          chooseProject={chooseProject}
+          openNew={(directory) => navigateWithSidebarReset(`/${base64Encode(directory)}/session`)}
+          openSession={navigateToSession}
+          prefetchSession={prefetchSession}
+          archiveSession={archiveSession}
+          scrollRef={(el) => {
+            if (!mobile) scrollContainerRef = el
+          }}
+        />
+      )}
     />
   )
 
@@ -2573,7 +2610,7 @@ export default function Layout(props: ParentProps) {
             >
               <main
                 classList={{
-                  "size-full overflow-x-hidden flex flex-col items-start contain-strict border-t border-border-weak-base bg-background-base xl:border-l xl:rounded-tl-[12px]": true,
+                  "size-full overflow-x-hidden flex flex-col items-start contain-strict border-t border-border-weak-base bg-background-base xl:border-l": true,
                 }}
               >
                 <Show when={!autoselecting.loading} fallback={<div class="size-full" />}>
@@ -2602,7 +2639,22 @@ export default function Layout(props: ParentProps) {
               }}
             >
               <Show when={peekProject()}>
-                <SidebarPanel project={peekProject} merged={false} />
+                <ConversationSidebar
+                  project={peekProject}
+                  sessions={peekSessions}
+                  dirs={peekDirs}
+                  currentDir={() => peekProject()?.worktree ?? ""}
+                  width={panel}
+                  now={sortNow}
+                  merged={() => false}
+                  hovering={sidebarHovering}
+                  chooseProject={chooseProject}
+                  openNew={(directory) => navigateWithSidebarReset(`/${base64Encode(directory)}/session`)}
+                  openSession={navigateToSession}
+                  prefetchSession={prefetchSession}
+                  archiveSession={archiveSession}
+                  scrollRef={() => {}}
+                />
               </Show>
             </div>
 

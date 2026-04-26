@@ -913,6 +913,7 @@ export type Session = {
   workspaceID?: string
   directory: string
   parentID?: string
+  catalogID?: string
   summary?: {
     additions: number
     deletions: number
@@ -929,6 +930,7 @@ export type Session = {
     updated: number
     compacting?: number
     archived?: number
+    pinned?: number
   }
   permission?: PermissionRuleset
   revert?: {
@@ -1074,6 +1076,7 @@ export type SyncEventSessionUpdated = {
       workspaceID: string | null
       directory: string | null
       parentID: string | null
+      catalogID: string | null
       summary: {
         additions: number
         deletions: number
@@ -1090,6 +1093,7 @@ export type SyncEventSessionUpdated = {
         updated: number | null
         compacting: number | null
         archived: number | null
+        pinned: number | null
       }
       permission: PermissionRuleset | null
       revert: {
@@ -1796,6 +1800,7 @@ export type GlobalSession = {
   workspaceID?: string
   directory: string
   parentID?: string
+  catalogID?: string
   summary?: {
     additions: number
     deletions: number
@@ -1812,6 +1817,7 @@ export type GlobalSession = {
     updated: number
     compacting?: number
     archived?: number
+    pinned?: number
   }
   permission?: PermissionRuleset
   revert?: {
@@ -1829,6 +1835,20 @@ export type McpResource = {
   description?: string
   mimeType?: string
   client: string
+}
+
+export type SessionCatalog = {
+  id: string
+  projectID: string
+  directory: string
+  key?: "temp" | "analysis" | "archived"
+  name: string
+  icon: string
+  sort: number
+  time: {
+    created: number
+    updated: number
+  }
 }
 
 export type TextPartInput = {
@@ -3022,6 +3042,144 @@ export type SessionStatusResponses = {
 
 export type SessionStatusResponse = SessionStatusResponses[keyof SessionStatusResponses]
 
+export type SessionCatalogListData = {
+  body?: never
+  path?: never
+  query: {
+    /**
+     * Project directory for the catalog
+     */
+    directory: string
+    name?: string
+  }
+  url: "/session/catalog"
+}
+
+export type SessionCatalogListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionCatalogListError = SessionCatalogListErrors[keyof SessionCatalogListErrors]
+
+export type SessionCatalogListResponses = {
+  /**
+   * List of session catalogs
+   */
+  200: Array<SessionCatalog>
+}
+
+export type SessionCatalogListResponse = SessionCatalogListResponses[keyof SessionCatalogListResponses]
+
+export type SessionCatalogCreateData = {
+  body?: {
+    name: string
+    icon?: string
+    sort?: number
+  }
+  path?: never
+  query: {
+    /**
+     * Project directory for the catalog
+     */
+    directory: string
+    name?: string
+  }
+  url: "/session/catalog"
+}
+
+export type SessionCatalogCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionCatalogCreateError = SessionCatalogCreateErrors[keyof SessionCatalogCreateErrors]
+
+export type SessionCatalogCreateResponses = {
+  /**
+   * Created session catalog
+   */
+  200: SessionCatalog
+}
+
+export type SessionCatalogCreateResponse = SessionCatalogCreateResponses[keyof SessionCatalogCreateResponses]
+
+export type SessionCatalogDeleteData = {
+  body?: never
+  path: {
+    catalogID: string
+  }
+  query?: {
+    directory?: string
+    name?: string
+  }
+  url: "/session/catalog/{catalogID}"
+}
+
+export type SessionCatalogDeleteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCatalogDeleteError = SessionCatalogDeleteErrors[keyof SessionCatalogDeleteErrors]
+
+export type SessionCatalogDeleteResponses = {
+  /**
+   * Deleted session catalog
+   */
+  200: boolean
+}
+
+export type SessionCatalogDeleteResponse = SessionCatalogDeleteResponses[keyof SessionCatalogDeleteResponses]
+
+export type SessionCatalogUpdateData = {
+  body?: {
+    name?: string
+    icon?: string
+    sort?: number
+  }
+  path: {
+    catalogID: string
+  }
+  query?: {
+    directory?: string
+    name?: string
+  }
+  url: "/session/catalog/{catalogID}"
+}
+
+export type SessionCatalogUpdateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCatalogUpdateError = SessionCatalogUpdateErrors[keyof SessionCatalogUpdateErrors]
+
+export type SessionCatalogUpdateResponses = {
+  /**
+   * Updated session catalog
+   */
+  200: SessionCatalog
+}
+
+export type SessionCatalogUpdateResponse = SessionCatalogUpdateResponses[keyof SessionCatalogUpdateResponses]
+
 export type SessionDeleteData = {
   body?: never
   path: {
@@ -3093,8 +3251,10 @@ export type SessionGetResponse = SessionGetResponses[keyof SessionGetResponses]
 export type SessionUpdateData = {
   body?: {
     title?: string
+    catalogID?: string | null
+    pinned?: boolean
     time?: {
-      archived?: number
+      archived?: number | null
     }
   }
   path: {

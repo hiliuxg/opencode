@@ -717,7 +717,7 @@ export default function Page() {
     if (fileTreeTab() !== "all") return
 
     const active = tabs().active()
-    if (active && active !== "review") return
+    if (active) return
 
     const first = openedTabs()[0]
     if (first) {

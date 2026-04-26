@@ -7,6 +7,7 @@ export namespace Identifier {
     session: "ses",
     message: "msg",
     permission: "per",
+    catalog: "cat",
     question: "que",
     user: "usr",
     part: "prt",

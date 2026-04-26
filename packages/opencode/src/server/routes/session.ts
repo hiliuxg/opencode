@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { stream } from "hono/streaming"
 import { describeRoute, validator, resolver } from "hono-openapi"
-import { SessionID, MessageID, PartID } from "@/session/schema"
+import { SessionID, SessionCatalogID, MessageID, PartID } from "@/session/schema"
 import z from "zod"
 import { Session } from "../../session"
 import { MessageV2 } from "../../session/message-v2"
@@ -92,6 +92,143 @@ export const SessionRoutes = lazy(() =>
       async (c) => {
         const result = await SessionStatus.list()
         return c.json(Object.fromEntries(result))
+      },
+    )
+    .get(
+      "/catalog",
+      describeRoute({
+        summary: "List session catalogs",
+        description: "Get session catalogs for the current project directory.",
+        operationId: "session.catalog.list",
+        responses: {
+          200: {
+            description: "List of session catalogs",
+            content: {
+              "application/json": {
+                schema: resolver(Session.CatalogInfo.array()),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          directory: z.string().min(1).meta({ description: "Project directory for the catalog" }),
+        }),
+      ),
+      async (c) => {
+        const query = c.req.valid("query")
+        const catalogs = await Session.Catalog.list({ directory: query.directory })
+        return c.json(catalogs)
+      },
+    )
+    .post(
+      "/catalog",
+      describeRoute({
+        summary: "Create session catalog",
+        description: "Create a session catalog for the current project directory.",
+        operationId: "session.catalog.create",
+        responses: {
+          200: {
+            description: "Created session catalog",
+            content: {
+              "application/json": {
+                schema: resolver(Session.CatalogInfo),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          directory: z.string().min(1).meta({ description: "Project directory for the catalog" }),
+        }),
+      ),
+      validator(
+        "json",
+        z.object({
+          name: z.string().trim().min(1),
+          icon: z.string().trim().min(1).optional(),
+          sort: z.number().optional(),
+        }),
+      ),
+      async (c) => {
+        const query = c.req.valid("query")
+        const body = c.req.valid("json")
+        const catalog = await Session.Catalog.create({ ...body, directory: query.directory })
+        return c.json(catalog)
+      },
+    )
+    .patch(
+      "/catalog/:catalogID",
+      describeRoute({
+        summary: "Update session catalog",
+        description: "Update a session catalog for the current project.",
+        operationId: "session.catalog.update",
+        responses: {
+          200: {
+            description: "Updated session catalog",
+            content: {
+              "application/json": {
+                schema: resolver(Session.CatalogInfo),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          catalogID: SessionCatalogID.zod,
+        }),
+      ),
+      validator(
+        "json",
+        z.object({
+          name: z.string().trim().min(1).optional(),
+          icon: z.string().trim().min(1).optional(),
+          sort: z.number().optional(),
+        }),
+      ),
+      async (c) => {
+        const catalogID = c.req.valid("param").catalogID
+        const body = c.req.valid("json")
+        const catalog = await Session.Catalog.update({ ...body, catalogID })
+        return c.json(catalog)
+      },
+    )
+    .delete(
+      "/catalog/:catalogID",
+      describeRoute({
+        summary: "Delete session catalog",
+        description: "Delete a session catalog and clear matching session assignments.",
+        operationId: "session.catalog.delete",
+        responses: {
+          200: {
+            description: "Deleted session catalog",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          catalogID: SessionCatalogID.zod,
+        }),
+      ),
+      async (c) => {
+        await Session.Catalog.remove(c.req.valid("param").catalogID)
+        return c.json(true)
       },
     )
     .get(
@@ -270,9 +407,11 @@ export const SessionRoutes = lazy(() =>
         "json",
         z.object({
           title: z.string().optional(),
+          catalogID: SessionCatalogID.zod.nullable().optional(),
+          pinned: z.boolean().optional(),
           time: z
             .object({
-              archived: z.number().optional(),
+              archived: z.number().nullable().optional(),
             })
             .optional(),
         }),
@@ -284,8 +423,14 @@ export const SessionRoutes = lazy(() =>
         if (updates.title !== undefined) {
           await Session.setTitle({ sessionID, title: updates.title })
         }
-        if (updates.time?.archived !== undefined) {
+        if (updates.time && "archived" in updates.time) {
           await Session.setArchived({ sessionID, time: updates.time.archived })
+        }
+        if ("catalogID" in updates) {
+          await Session.setCatalog({ sessionID, catalogID: updates.catalogID ?? undefined })
+        }
+        if (updates.pinned !== undefined) {
+          await Session.setPinned({ sessionID, pinned: updates.pinned })
         }
 
         const session = await Session.get(sessionID)

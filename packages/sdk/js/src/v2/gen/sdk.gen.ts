@@ -116,6 +116,14 @@ import type {
   QuestionReplyResponses,
   SessionAbortErrors,
   SessionAbortResponses,
+  SessionCatalogCreateErrors,
+  SessionCatalogCreateResponses,
+  SessionCatalogDeleteErrors,
+  SessionCatalogDeleteResponses,
+  SessionCatalogListErrors,
+  SessionCatalogListResponses,
+  SessionCatalogUpdateErrors,
+  SessionCatalogUpdateResponses,
   SessionChildrenErrors,
   SessionChildrenResponses,
   SessionCommandErrors,
@@ -1314,6 +1322,182 @@ export class Worktree extends HeyApiClient {
   }
 }
 
+export class Catalog extends HeyApiClient {
+  /**
+   * List session catalogs
+   *
+   * Get session catalogs for the current project directory.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory: string
+      name?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "name" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionCatalogListResponses, SessionCatalogListErrors, ThrowOnError>({
+      url: "/session/catalog",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session catalog
+   *
+   * Create a session catalog for the current project directory.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory: string
+      query_name?: string
+      body_name?: string
+      icon?: string
+      sort?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            {
+              in: "query",
+              key: "query_name",
+              map: "name",
+            },
+            {
+              in: "body",
+              key: "body_name",
+              map: "name",
+            },
+            { in: "body", key: "icon" },
+            { in: "body", key: "sort" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCatalogCreateResponses,
+      SessionCatalogCreateErrors,
+      ThrowOnError
+    >({
+      url: "/session/catalog",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session catalog
+   *
+   * Delete a session catalog and clear matching session assignments.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      catalogID: string
+      directory?: string
+      name?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "catalogID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "name" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      SessionCatalogDeleteResponses,
+      SessionCatalogDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/session/catalog/{catalogID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update session catalog
+   *
+   * Update a session catalog for the current project.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      catalogID: string
+      directory?: string
+      query_name?: string
+      body_name?: string
+      icon?: string
+      sort?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "catalogID" },
+            { in: "query", key: "directory" },
+            {
+              in: "query",
+              key: "query_name",
+              map: "name",
+            },
+            {
+              in: "body",
+              key: "body_name",
+              map: "name",
+            },
+            { in: "body", key: "icon" },
+            { in: "body", key: "sort" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      SessionCatalogUpdateResponses,
+      SessionCatalogUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/session/catalog/{catalogID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Session2 extends HeyApiClient {
   /**
    * List sessions
@@ -1501,8 +1685,10 @@ export class Session2 extends HeyApiClient {
       directory?: string
       name?: string
       title?: string
+      catalogID?: string | null
+      pinned?: boolean
       time?: {
-        archived?: number
+        archived?: number | null
       }
     },
     options?: Options<never, ThrowOnError>,
@@ -1516,6 +1702,8 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "name" },
             { in: "body", key: "title" },
+            { in: "body", key: "catalogID" },
+            { in: "body", key: "pinned" },
             { in: "body", key: "time" },
           ],
         },
@@ -2255,6 +2443,11 @@ export class Session2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _catalog?: Catalog
+  get catalog(): Catalog {
+    return (this._catalog ??= new Catalog({ client: this.client }))
   }
 }
 

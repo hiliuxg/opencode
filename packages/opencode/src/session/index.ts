@@ -9,10 +9,11 @@ import { Config } from "../config/config"
 import { Flag } from "../flag/flag"
 import { Installation } from "../installation"
 
-import { Database, NotFoundError, eq, and, gte, isNull, desc, like, inArray, lt } from "../storage/db"
+import { Database, NotFoundError, eq, and, gte, isNull, desc, asc, like, inArray, lt } from "../storage/db"
 import { SyncEvent } from "../sync"
 import type { SQL } from "../storage/db"
-import { SessionTable } from "./session.sql"
+import { SessionCatalogTable, SessionTable } from "./session.sql"
+import { NamedError } from "@opencode-ai/util/error"
 import { ProjectTable } from "../project/project.sql"
 import { Storage } from "@/storage/storage"
 import { Log } from "../util/log"
@@ -26,7 +27,7 @@ import { Command } from "../command"
 import { Snapshot } from "@/snapshot"
 import { ProjectID } from "../project/schema"
 import { WorkspaceID } from "../control-plane/schema"
-import { SessionID, MessageID, PartID } from "./schema"
+import { SessionID, SessionCatalogID, MessageID, PartID } from "./schema"
 
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
@@ -53,6 +54,7 @@ export namespace Session {
   }
 
   type SessionRow = typeof SessionTable.$inferSelect
+  type CatalogRow = typeof SessionCatalogTable.$inferSelect
 
   export function fromRow(row: SessionRow): Info {
     const summary =
@@ -73,6 +75,7 @@ export namespace Session {
       workspaceID: row.workspace_id ?? undefined,
       directory: row.directory,
       parentID: row.parent_id ?? undefined,
+      catalogID: row.catalog_id ?? undefined,
       title: row.title,
       version: row.version,
       summary,
@@ -84,6 +87,7 @@ export namespace Session {
         updated: row.time_updated,
         compacting: row.time_compacting ?? undefined,
         archived: row.time_archived ?? undefined,
+        pinned: row.time_pinned ?? undefined,
       },
     }
   }
@@ -94,6 +98,7 @@ export namespace Session {
       project_id: info.projectID,
       workspace_id: info.workspaceID,
       parent_id: info.parentID,
+      catalog_id: info.catalogID,
       slug: info.slug,
       directory: info.directory,
       title: info.title,
@@ -109,6 +114,24 @@ export namespace Session {
       time_updated: info.time.updated,
       time_compacting: info.time.compacting,
       time_archived: info.time.archived,
+      time_pinned: info.time.pinned,
+    }
+  }
+
+  function catalog(row: CatalogRow): CatalogInfo {
+    const key = row.key === "notes" ? undefined : (row.key ?? undefined)
+    return {
+      id: row.id,
+      projectID: row.project_id,
+      directory: row.directory,
+      key,
+      name: row.name,
+      icon: row.icon,
+      sort: row.sort,
+      time: {
+        created: row.time_created,
+        updated: row.time_updated,
+      },
     }
   }
 
@@ -130,6 +153,7 @@ export namespace Session {
       workspaceID: WorkspaceID.zod.optional(),
       directory: z.string(),
       parentID: SessionID.zod.optional(),
+      catalogID: SessionCatalogID.zod.optional(),
       summary: z
         .object({
           additions: z.number(),
@@ -150,6 +174,7 @@ export namespace Session {
         updated: z.number(),
         compacting: z.number().optional(),
         archived: z.number().optional(),
+        pinned: z.number().optional(),
       }),
       permission: Permission.Ruleset.optional(),
       revert: z
@@ -165,6 +190,28 @@ export namespace Session {
       ref: "Session",
     })
   export type Info = z.output<typeof Info>
+
+  export const CatalogKey = z.enum(["temp", "analysis", "archived"])
+  export type CatalogKey = z.output<typeof CatalogKey>
+
+  export const CatalogInfo = z
+    .object({
+      id: SessionCatalogID.zod,
+      projectID: ProjectID.zod,
+      directory: z.string(),
+      key: CatalogKey.optional(),
+      name: z.string(),
+      icon: z.string(),
+      sort: z.number(),
+      time: z.object({
+        created: z.number(),
+        updated: z.number(),
+      }),
+    })
+    .meta({
+      ref: "SessionCatalog",
+    })
+  export type CatalogInfo = z.output<typeof CatalogInfo>
 
   export const ProjectInfo = z
     .object({
@@ -312,6 +359,13 @@ export namespace Session {
     }
   }
 
+  export const SystemCatalogError = NamedError.create(
+    "SessionSystemCatalogError",
+    z.object({
+      message: z.string(),
+    }),
+  )
+
   export interface Interface {
     readonly create: (input?: {
       parentID?: SessionID
@@ -325,7 +379,9 @@ export namespace Session {
     readonly share: (id: SessionID) => Effect.Effect<{ url: string }>
     readonly unshare: (id: SessionID) => Effect.Effect<void>
     readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
-    readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
+    readonly setArchived: (input: { sessionID: SessionID; time?: number | null }) => Effect.Effect<void>
+    readonly setCatalog: (input: { sessionID: SessionID; catalogID?: SessionCatalogID }) => Effect.Effect<void>
+    readonly setPinned: (input: { sessionID: SessionID; pinned: boolean }) => Effect.Effect<void>
     readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
     readonly setRevert: (input: {
       sessionID: SessionID
@@ -556,8 +612,22 @@ export namespace Session {
         yield* patch(input.sessionID, { title: input.title })
       })
 
-      const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
-        yield* patch(input.sessionID, { time: { archived: input.time } })
+      const setArchived = Effect.fn("Session.setArchived")(function* (input: {
+        sessionID: SessionID
+        time?: number | null
+      }) {
+        yield* patch(input.sessionID, { time: { archived: input.time ?? null } })
+      })
+
+      const setCatalog = Effect.fn("Session.setCatalog")(function* (input: {
+        sessionID: SessionID
+        catalogID?: SessionCatalogID
+      }) {
+        yield* patch(input.sessionID, { catalogID: input.catalogID ?? null, time: { updated: Date.now() } })
+      })
+
+      const setPinned = Effect.fn("Session.setPinned")(function* (input: { sessionID: SessionID; pinned: boolean }) {
+        yield* patch(input.sessionID, { time: { updated: Date.now(), pinned: input.pinned ? Date.now() : null } })
       })
 
       const setPermission = Effect.fn("Session.setPermission")(function* (input: {
@@ -668,6 +738,8 @@ export namespace Session {
         unshare,
         setTitle,
         setArchived,
+        setCatalog,
+        setPinned,
         setPermission,
         setRevert,
         clearRevert,
@@ -715,8 +787,18 @@ export namespace Session {
     runPromise((svc) => svc.setTitle(input)),
   )
 
-  export const setArchived = fn(z.object({ sessionID: SessionID.zod, time: z.number().optional() }), (input) =>
-    runPromise((svc) => svc.setArchived(input)),
+  export const setArchived = fn(
+    z.object({ sessionID: SessionID.zod, time: z.number().nullable().optional() }),
+    (input) => runPromise((svc) => svc.setArchived(input)),
+  )
+
+  export const setCatalog = fn(
+    z.object({ sessionID: SessionID.zod, catalogID: SessionCatalogID.zod.optional() }),
+    (input) => runPromise((svc) => svc.setCatalog(input)),
+  )
+
+  export const setPinned = fn(z.object({ sessionID: SessionID.zod, pinned: z.boolean() }), (input) =>
+    runPromise((svc) => svc.setPinned(input)),
   )
 
   export const setPermission = fn(z.object({ sessionID: SessionID.zod, permission: Permission.Ruleset }), (input) =>
@@ -740,6 +822,181 @@ export namespace Session {
   export const messages = fn(z.object({ sessionID: SessionID.zod, limit: z.number().optional() }), (input) =>
     runPromise((svc) => svc.messages(input)),
   )
+
+  export namespace Catalog {
+    const defaults = [
+      { key: "temp", name: "Temporary sessions", icon: "prompt", sort: 0 },
+      { key: "analysis", name: "Focused analysis", icon: "checklist", sort: 1 },
+      { key: "archived", name: "Archived", icon: "archive", sort: 2 },
+    ] satisfies { key: CatalogKey; name: string; icon: string; sort: number }[]
+    const removed = new Set(["Study notes", "学习笔记"])
+
+    function ensure(db: Database.TxOrDb, directory: string) {
+      const rows = db
+        .select()
+        .from(SessionCatalogTable)
+        .where(
+          and(eq(SessionCatalogTable.project_id, Instance.project.id), eq(SessionCatalogTable.directory, directory)),
+        )
+        .all()
+      const now = Date.now()
+
+      rows
+        .filter((row) => row.key === "notes" && removed.has(row.name))
+        .forEach((row) => {
+          db.update(SessionTable)
+            .set({ catalog_id: null, time_updated: now })
+            .where(and(eq(SessionTable.project_id, Instance.project.id), eq(SessionTable.catalog_id, row.id)))
+            .run()
+          db.delete(SessionCatalogTable)
+            .where(and(eq(SessionCatalogTable.project_id, Instance.project.id), eq(SessionCatalogTable.id, row.id)))
+            .run()
+        })
+
+      const keys = new Set(rows.map((row) => row.key).filter((key) => key !== "notes"))
+      const missing = defaults.filter((item) => !keys.has(item.key))
+      if (missing.length === 0) return
+
+      db.insert(SessionCatalogTable)
+        .values(
+          missing.map((item) => ({
+            id: SessionCatalogID.descending(),
+            project_id: Instance.project.id,
+            directory,
+            key: item.key,
+            name: item.name,
+            icon: item.icon,
+            sort: item.sort,
+            time_created: now,
+            time_updated: now,
+          })),
+        )
+        .run()
+    }
+
+    export const list = fn(z.object({ directory: z.string().min(1) }), (input) =>
+      Database.transaction((db) => {
+        ensure(db, input.directory)
+        return db
+          .select()
+          .from(SessionCatalogTable)
+          .where(
+            and(
+              eq(SessionCatalogTable.project_id, Instance.project.id),
+              eq(SessionCatalogTable.directory, input.directory),
+            ),
+          )
+          .orderBy(asc(SessionCatalogTable.sort), asc(SessionCatalogTable.time_created))
+          .all()
+          .map(catalog)
+      }),
+    )
+
+    export const create = fn(
+      z.object({
+        directory: z.string().min(1),
+        name: z.string().trim().min(1),
+        icon: z.string().trim().min(1).optional(),
+        sort: z.number().optional(),
+      }),
+      (input) =>
+        Database.transaction((db) => {
+          ensure(db, input.directory)
+          const last = db
+            .select({ sort: SessionCatalogTable.sort })
+            .from(SessionCatalogTable)
+            .where(
+              and(
+                eq(SessionCatalogTable.project_id, Instance.project.id),
+                eq(SessionCatalogTable.directory, input.directory),
+              ),
+            )
+            .orderBy(desc(SessionCatalogTable.sort))
+            .get()
+          const now = Date.now()
+          const row = db
+            .insert(SessionCatalogTable)
+            .values({
+              id: SessionCatalogID.descending(),
+              project_id: Instance.project.id,
+              directory: input.directory,
+              name: input.name,
+              icon: input.icon ?? "folder",
+              sort: input.sort ?? (last?.sort ?? -1) + 1,
+              time_created: now,
+              time_updated: now,
+            })
+            .returning()
+            .get()
+          return catalog(row)
+        }),
+    )
+
+    export const update = fn(
+      z.object({
+        catalogID: SessionCatalogID.zod,
+        name: z.string().trim().min(1).optional(),
+        icon: z.string().trim().min(1).optional(),
+        sort: z.number().optional(),
+      }),
+      (input) => {
+        const row = Database.use((db) =>
+          db
+            .update(SessionCatalogTable)
+            .set({
+              ...(input.name !== undefined && { name: input.name }),
+              ...(input.icon !== undefined && { icon: input.icon }),
+              ...(input.sort !== undefined && { sort: input.sort }),
+              time_updated: Date.now(),
+            })
+            .where(
+              and(eq(SessionCatalogTable.project_id, Instance.project.id), eq(SessionCatalogTable.id, input.catalogID)),
+            )
+            .returning()
+            .get(),
+        )
+        if (!row) throw new NotFoundError({ message: `Session catalog not found: ${input.catalogID}` })
+        return catalog(row)
+      },
+    )
+
+    export const remove = fn(SessionCatalogID.zod, (id) => {
+      const catalog = Database.use((db) =>
+        db
+          .select()
+          .from(SessionCatalogTable)
+          .where(and(eq(SessionCatalogTable.project_id, Instance.project.id), eq(SessionCatalogTable.id, id)))
+          .get(),
+      )
+      if (!catalog) throw new NotFoundError({ message: `Session catalog not found: ${id}` })
+      if (catalog.key === "temp" || catalog.key === "archived") {
+        throw new SystemCatalogError({ message: "System session catalog cannot be deleted" })
+      }
+      const sessions = Database.use((db) =>
+        db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(and(eq(SessionTable.project_id, Instance.project.id), eq(SessionTable.catalog_id, id)))
+          .all(),
+      )
+      const now = Date.now()
+      sessions.forEach((session) => {
+        SyncEvent.run(Event.Updated, {
+          sessionID: session.id,
+          info: { catalogID: null, time: { updated: now } },
+        })
+      })
+      const row = Database.use((db) =>
+        db
+          .delete(SessionCatalogTable)
+          .where(and(eq(SessionCatalogTable.project_id, Instance.project.id), eq(SessionCatalogTable.id, id)))
+          .returning()
+          .get(),
+      )
+      if (!row) throw new NotFoundError({ message: `Session catalog not found: ${id}` })
+      return true
+    })
+  }
 
   export function* list(input?: {
     directory?: string
@@ -775,7 +1032,7 @@ export namespace Session {
         .select()
         .from(SessionTable)
         .where(and(...conditions))
-        .orderBy(desc(SessionTable.time_updated))
+        .orderBy(desc(SessionTable.time_pinned), desc(SessionTable.time_updated))
         .limit(limit)
         .all(),
     )

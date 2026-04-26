@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test"
 import type { PermissionRequest, Session } from "@opencode-ai/sdk/v2/client"
 import { trimSessions } from "./session-trim"
 
-const session = (input: { id: string; parentID?: string; created: number; updated?: number; archived?: number }) =>
+const session = (input: {
+  id: string
+  parentID?: string
+  created: number
+  updated?: number
+  archived?: number
+  pinned?: number
+}) =>
   ({
     id: input.id,
     parentID: input.parentID,
@@ -10,6 +17,7 @@ const session = (input: { id: string; parentID?: string; created: number; update
       created: input.created,
       updated: input.updated,
       archived: input.archived,
+      pinned: input.pinned,
     },
   }) as Session
 
@@ -26,6 +34,19 @@ describe("trimSessions", () => {
 
     const result = trimSessions(list, { limit: 2, permission: {}, now })
     expect(result.map((x) => x.id)).toEqual(["a", "b", "c", "d"])
+  })
+
+  test("keeps pinned roots beyond the limit", () => {
+    const now = 1_000_000
+    const list = [
+      session({ id: "a", created: now - 100_000 }),
+      session({ id: "b", created: now - 90_000 }),
+      session({ id: "c", created: now - 30_000_000 }),
+      session({ id: "z-pinned", created: now - 30_000_000, pinned: now - 10 }),
+    ]
+
+    const result = trimSessions(list, { limit: 2, permission: {}, now })
+    expect(result.map((x) => x.id)).toEqual(["a", "b", "z-pinned"])
   })
 
   test("keeps children when root is kept, permission exists, or child is recent", () => {
