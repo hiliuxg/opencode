@@ -21,7 +21,7 @@ import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
 import { Persist, persisted } from "@/utils/persist"
 import { sessionPermissionRequest } from "../session/composer/session-request-tree"
-import { workspaceKey } from "./helpers"
+import { archivedList, movable, workspaceKey } from "./helpers"
 
 type Props = {
   project: Accessor<LocalProject | undefined>
@@ -458,7 +458,9 @@ export function ConversationSidebar(props: Props) {
   const showRename = (session: Session) => dialog.show(() => <RenameDialog session={session} />)
 
   const archive = async (session: Session) => {
-    await props.archiveSession(session, { catalogID: archcat()?.id, pinned: false })
+    const id = archcat()?.id
+    await props.archiveSession(session, { catalogID: id, pinned: false })
+    setArch((list) => archivedList(list, session, id))
     if (active()?.key === archived) void fetchArchived()
   }
 
@@ -647,18 +649,20 @@ export function ConversationSidebar(props: Props) {
                             : language.t("conversation.session.pin")}
                         </DropdownMenu.ItemLabel>
                       </DropdownMenu.Item>
-                      <button
-                        type="button"
-                        data-slot="dropdown-menu-item"
-                        class="w-full justify-start text-left hover:bg-surface-raised-base-hover"
-                        onClick={(event) => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          setMove(true)
-                        }}
-                      >
-                        <span data-slot="dropdown-menu-item-label">{language.t("conversation.session.move")}</span>
-                      </button>
+                      <Show when={movable(active()?.key)}>
+                        <button
+                          type="button"
+                          data-slot="dropdown-menu-item"
+                          class="w-full justify-start text-left hover:bg-surface-raised-base-hover"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setMove(true)
+                          }}
+                        >
+                          <span data-slot="dropdown-menu-item-label">{language.t("conversation.session.move")}</span>
+                        </button>
+                      </Show>
                       <DropdownMenu.Item onSelect={() => showRename(session)}>
                         <DropdownMenu.ItemLabel>{language.t("common.rename")}</DropdownMenu.ItemLabel>
                       </DropdownMenu.Item>

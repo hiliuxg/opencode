@@ -131,6 +131,27 @@ describe("tool.bash", () => {
       },
     })
   })
+
+  each("injects instance directory environment variable", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const bash = await BashTool.init()
+        const code = "process.stdout.write(process.env.OPENCODE_CURRENT_DIR ?? String())"
+        const result = await bash.execute(
+          {
+            command: `${bin} -e ${evalarg(code)}`,
+            workdir: tmp.path,
+            description: "Print workdir env",
+          },
+          ctx,
+        )
+        expect(result.metadata.exit).toBe(0)
+        expect(path.resolve(result.output.trim())).toBe(path.resolve(projectRoot))
+      },
+    })
+  })
 })
 
 describe("tool.bash permissions", () => {

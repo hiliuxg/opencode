@@ -1518,40 +1518,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
                 const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
                 if (finished && !handle.message.error) {
-                  // Check if message has no content parts (text/reasoning/tool)
-                  const contentParts = (handle.message as any).parts?.filter(
-                    (p: any) => p.type === "text" || p.type === "reasoning" || p.type === "tool"
-                  )
-                  const hasContent = contentParts?.length > 0 && contentParts.some(
-                    (p: any) => (p.text?.length ?? 0) > 0
-                  )
-
-                  if (!hasContent && handle.message.finish !== "stop") {
-                    log.warn("[prompt.ts] Model returned no content", {
-                      modelID: model.id,
-                      providerID: model.providerID,
-                      finish: handle.message.finish,
-                      partsCount: (handle.message as any).parts?.length ?? 0,
-                      hasContent,
-                      contentParts: contentParts?.map((p: any) => ({
-                        type: p.type,
-                        textLength: p.text?.length ?? 0,
-                        textPreview: p.text?.slice(0, 100),
-                      })),
-                      allParts: (handle.message as any).parts?.map((p: any) => ({
-                        type: p.type,
-                        tool: p.tool,
-                        state: p.state,
-                        textLength: p.text?.length ?? 0,
-                      })),
-                    })
-                    handle.message.error = new NamedError.Unknown({
-                      message: `该模型 ${model.id} 可能没有token额度了，请切换到另一个模型重试，或者打开左下角的"设置" -> "令牌管理" 页面，更新令牌。`,
-                    }).toObject()
-                    yield* sessions.updateMessage(handle.message)
-                    return "break" as const
-                  }
-
                   if (format.type === "json_schema") {
                     handle.message.error = new MessageV2.StructuredOutputError({
                       message: "Model did not produce structured output",
@@ -1561,7 +1527,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     return "break" as const
                   }
                 }
-
 
                 if (result === "stop") return "break" as const
                 if (result === "compact") {

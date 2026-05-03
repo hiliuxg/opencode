@@ -1230,6 +1230,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
+  const variants = createMemo(() => ["default", ...local.model.variant.list()])
+
   return (
     <div class="relative size-full _max-h-[320px] flex flex-col gap-0">
       <PromptPopover
@@ -1450,6 +1452,25 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </ModelSelectorPopover>
                   </TooltipKeybind>
                 </Show>
+                {/* <TooltipKeybind
+                  placement="top"
+                  gutter={4}
+                  title={language.t("command.model.variant.cycle")}
+                  keybind={command.keybind("model.variant.cycle")}
+                >
+                  <Select
+                    size="normal"
+                    options={variants()}
+                    current={local.model.variant.current() ?? "default"}
+                    label={(item) => (item === "default" ? language.t("common.default") : item)}
+                    onSelect={(item) => local.model.variant.set(item === "default" ? undefined : item)}
+                    class="capitalize max-w-[160px]"
+                    valueClass="truncate text-13-regular"
+                    triggerStyle={{ height: "28px" }}
+                    triggerProps={{ "data-action": "prompt-model-variant" }}
+                    variant="ghost"
+                  />
+                </TooltipKeybind> */}
                 <Tooltip placement="top" gutter={4} value={language.t("command.skill.choose")}>
                   <SkillSelectorPopover
                     triggerAs={Button}
@@ -1469,6 +1490,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </Show>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              {/*
               <TooltipKeybind
                 placement="top"
                 gutter={8}
@@ -1490,6 +1512,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <Icon name="shield" size="small" classList={{ "text-icon-success-base": accepting() }} />
                 </Button>
               </TooltipKeybind>
+              */}
               <Show when={store.mode === "normal"}>
                 <TooltipKeybind
                   placement="top"

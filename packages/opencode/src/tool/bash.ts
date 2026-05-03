@@ -290,6 +290,7 @@ async function shellEnv(ctx: Tool.Context, cwd: string) {
   return {
     ...process.env,
     ...extra.env,
+    OPENCODE_CURRENT_DIR: Instance.directory,
   }
 }
 

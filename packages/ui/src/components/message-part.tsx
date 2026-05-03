@@ -58,6 +58,7 @@ import { animate } from "motion"
 import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
 import { DataTable } from "./datatable"
+import { filelink } from "./tool-file-link"
 
 const SQL_ROWS = 120
 
@@ -380,6 +381,12 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: i18n.t("ui.tool.mcp.render_chart"),
         subtitle: input.title,
       }
+    case "kudata-mcp_get_file_link":
+      return filelink(input, {
+        title: i18n.t("ui.tool.get_file_link"),
+        share: i18n.t("ui.tool.get_file_link.share"),
+        download: i18n.t("ui.tool.get_file_link.download"),
+      })
     case "kudata-mcp_send_message":
       return {
         icon: "bubble-5",
@@ -2592,6 +2599,22 @@ ToolRegistry.register({
     )
   },
 })
+
+function Filelink(props: ToolProps) {
+  const content = createMemo(() => {
+    try { return JSON.stringify(props.input, null, 2) }
+    catch { return String(props.input) }
+  })
+  return <McpTabsTool {...props} inputName="input.json" inputContent={content()} />
+}
+
+const filelinks = ["kudata-mcp_get_file_link"] as const
+filelinks.forEach((name) =>
+  ToolRegistry.register({
+    name,
+    render: Filelink,
+  }),
+)
 
 ToolRegistry.register({
   name: "kudata-mcp_send_message",

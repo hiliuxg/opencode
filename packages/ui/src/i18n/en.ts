@@ -123,6 +123,9 @@ export const dict: Record<string, string> = {
   "ui.tool.mcp.run_query.no_results": "No results yet.",
   "ui.tool.mcp.get_table_columns": "Get Table Columns",
   "ui.tool.mcp.render_chart": "Chart",
+  "ui.tool.get_file_link": "Get File Link",
+  "ui.tool.get_file_link.share": "Share link",
+  "ui.tool.get_file_link.download": "Download link",
 
   "ui.basicTool.called": "Called `{{tool}}`",
   "ui.toolErrorCard.failed": "Failed",

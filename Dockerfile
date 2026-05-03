@@ -22,13 +22,21 @@ COPY packages/opencode/node_modules /root/.config/opencode/node_modules
 FROM base AS build-amd64
 COPY packages/opencode/dist/opencode-linux-x64-baseline/bin/opencode /usr/local/bin/opencode
 
-FROM base AS build-arm64
-COPY packages/opencode/dist/opencode-linux-arm64/bin/opencode /usr/local/bin/opencode
+#FROM base AS build-arm64
+#COPY packages/opencode/dist/opencode-linux-arm64/bin/opencode /usr/local/bin/opencode
 
 ARG TARGETARCH
 FROM build-${TARGETARCH}
 
 COPY packages/app/dist /usr/local/bin/ui
+RUN mkdir -p /root/.config/cc-connect
+COPY docker/cc-connect/cc-connect-v1.3.2-dirty-linux-amd64 /usr/local/bin/cc-connect
+COPY docker/cc-connect/config.toml /root/.config/cc-connect/config.toml
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN opencode --version
-ENTRYPOINT ["opencode"]
+RUN chmod +x /usr/local/bin/cc-connect /usr/local/bin/entrypoint.sh
+RUN cc-connect --version
+
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["both"]

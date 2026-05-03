@@ -1,5 +1,5 @@
 import { getFilename } from "@opencode-ai/util/path"
-import { type Session } from "@opencode-ai/sdk/v2/client"
+import { type Session, type SessionCatalog } from "@opencode-ai/sdk/v2/client"
 
 type SessionStore = {
   session?: Session[]
@@ -38,6 +38,26 @@ export const sortedRootSessions = (store: SessionStore, now: number) => roots(st
 
 export const latestRootSession = (stores: SessionStore[], now: number) =>
   stores.flatMap(roots).sort(sortSessions(now))[0]
+
+export const movable = (key: SessionCatalog["key"] | undefined) => key !== "archived"
+
+const stamp = (session: Session) => session.time.updated ?? session.time.created
+
+const sort = (list: Session[]) =>
+  list.slice().sort((a, b) => stamp(b) - stamp(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+export function archivedList(list: Session[], session: Session, id: string | undefined, time = Date.now()) {
+  const next = {
+    ...session,
+    catalogID: id ?? session.catalogID,
+    time: {
+      ...session.time,
+      archived: time,
+      pinned: undefined,
+    },
+  }
+  return sort([...list.filter((item) => item.id !== session.id), next])
+}
 
 export function hasProjectPermissions<T>(
   request: Record<string, T[] | undefined> | undefined,

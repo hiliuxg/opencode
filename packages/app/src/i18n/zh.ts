@@ -140,7 +140,7 @@ export const dict = {
   "dialog.provider.openrouter.note": "使用 OpenRouter 账号或 API 密钥连接",
   "dialog.provider.vercel.note": "使用 Vercel 账号或 API 密钥连接",
 
-  "dialog.skill.select.title": "选择技能",
+  "dialog.skill.select.title": "技能",
   "dialog.skill.search.placeholder": "搜索技能",
   "dialog.skill.empty": "未找到技能",
   "dialog.skill.manage": "管理技能",
