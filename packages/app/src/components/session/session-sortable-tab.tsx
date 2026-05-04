@@ -3,7 +3,7 @@ import type { JSX } from "solid-js"
 import { createSortable } from "@thisbeyond/solid-dnd"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
-import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
+import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { getFilename } from "@opencode-ai/util/path"
 import { useFile } from "@/context/file"
@@ -33,6 +33,11 @@ export function SortableTab(props: { tab: string; onTabClose: (tab: string) => v
   const command = useCommand()
   const sortable = createSortable(props.tab)
   const path = createMemo(() => file.pathFromTab(props.tab))
+  const tip = createMemo(() => {
+    const value = path()
+    if (!value) return
+    return file.absolute(value)
+  })
   const content = createMemo(() => {
     const value = path()
     if (!value) return
@@ -62,7 +67,16 @@ export function SortableTab(props: { tab: string; onTabClose: (tab: string) => v
           hideCloseButton
           onMiddleClick={() => props.onTabClose(props.tab)}
         >
-          <Show when={content()}>{(value) => value()}</Show>
+          <Tooltip
+            value={<span>{tip()}</span>}
+            placement="bottom"
+            gutter={10}
+            inactive={!tip()}
+            class="min-w-0"
+            contentClass="max-w-[min(80vw,40rem)] break-all text-left"
+          >
+            <Show when={content()}>{(value) => value()}</Show>
+          </Tooltip>
         </Tabs.Trigger>
       </div>
     </div>

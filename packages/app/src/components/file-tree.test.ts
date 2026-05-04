@@ -3,6 +3,9 @@ import { beforeAll, describe, expect, mock, test } from "bun:test"
 let shouldListRoot: typeof import("./file-tree").shouldListRoot
 let shouldListExpanded: typeof import("./file-tree").shouldListExpanded
 let dirsToExpand: typeof import("./file-tree").dirsToExpand
+let clipboardPath: typeof import("./file-tree").clipboardPath
+let pasteTarget: typeof import("./file-tree").pasteTarget
+let pasteBlocked: typeof import("./file-tree").pasteBlocked
 
 beforeAll(async () => {
   mock.module("@solidjs/router", () => ({
@@ -44,6 +47,9 @@ beforeAll(async () => {
   shouldListRoot = mod.shouldListRoot
   shouldListExpanded = mod.shouldListExpanded
   dirsToExpand = mod.dirsToExpand
+  clipboardPath = mod.clipboardPath
+  pasteTarget = mod.pasteTarget
+  pasteBlocked = mod.pasteBlocked
 })
 
 describe("file tree fetch discipline", () => {
@@ -97,5 +103,26 @@ describe("file tree fetch discipline", () => {
         expanded: (dir) => expanded.has(dir),
       }),
     ).toEqual(["src/components"])
+  })
+})
+
+describe("file tree clipboard operations", () => {
+  test("reads the first usable path from clipboard text", () => {
+    expect(clipboardPath("")).toBeUndefined()
+    expect(clipboardPath("\n  src/file.ts  \n")).toBe("src/file.ts")
+    expect(clipboardPath("\nfile://src/file.ts\nfile://other.ts")).toBe("file://src/file.ts")
+  })
+
+  test("pastes with the source basename inside the selected directory", () => {
+    expect(pasteTarget({ src: "src/file.ts", dir: "" })).toBe("file.ts")
+    expect(pasteTarget({ src: "src/file.ts", dir: "lib" })).toBe("lib/file.ts")
+    expect(pasteTarget({ src: "src/components", dir: "lib" })).toBe("lib/components")
+  })
+
+  test("blocks cutting a directory into itself", () => {
+    expect(pasteBlocked({ op: "cut", src: "src", dir: "src" })).toBe(true)
+    expect(pasteBlocked({ op: "cut", src: "src", dir: "src/components" })).toBe(true)
+    expect(pasteBlocked({ op: "copy", src: "src", dir: "src/components" })).toBe(false)
+    expect(pasteBlocked({ op: "cut", src: "src", dir: "lib" })).toBe(false)
   })
 })

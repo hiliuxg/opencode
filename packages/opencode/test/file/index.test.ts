@@ -212,6 +212,53 @@ describe("file/index Filesystem patterns", () => {
     })
   })
 
+  describe("File.copy()", () => {
+    test("copies a file without replacing an existing destination", async () => {
+      await using tmp = await tmpdir()
+      await fs.writeFile(path.join(tmp.path, "note.txt"), "hello", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "note copy.txt"), "existing", "utf-8")
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const copied = await File.copy("note.txt", "note.txt")
+
+          expect(copied).toBe("note copy 2.txt")
+          expect(await fs.readFile(path.join(tmp.path, copied), "utf-8")).toBe("hello")
+          expect(await fs.readFile(path.join(tmp.path, "note copy.txt"), "utf-8")).toBe("existing")
+        },
+      })
+    })
+
+    test("copies a directory recursively", async () => {
+      await using tmp = await tmpdir()
+      await fs.mkdir(path.join(tmp.path, "src", "nested"), { recursive: true })
+      await fs.writeFile(path.join(tmp.path, "src", "nested", "file.txt"), "hello", "utf-8")
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const copied = await File.copy("src", "lib/src")
+
+          expect(copied).toBe("lib/src")
+          expect(await fs.readFile(path.join(tmp.path, "lib", "src", "nested", "file.txt"), "utf-8")).toBe("hello")
+        },
+      })
+    })
+
+    test("rejects copying a directory into itself", async () => {
+      await using tmp = await tmpdir()
+      await fs.mkdir(path.join(tmp.path, "src", "nested"), { recursive: true })
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          await expect(File.copy("src", "src/nested/src")).rejects.toThrow("Cannot copy a directory into itself")
+        },
+      })
+    })
+  })
+
   describe("File.changed() - Filesystem.readText() for untracked files", () => {
     test("reads untracked files via Filesystem.readText()", async () => {
       await using tmp = await tmpdir({ git: true })

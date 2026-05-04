@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { Session } from "@opencode-ai/sdk/v2/client"
-import { archivedList, movable } from "./helpers"
+import type { Session, SessionCatalog } from "@opencode-ai/sdk/v2/client"
+import { archivedList, catalogs, movable } from "./helpers"
 
 const item = (id: string, time: Session["time"], input: Partial<Session> = {}): Session => ({
   id,
@@ -11,6 +11,17 @@ const item = (id: string, time: Session["time"], input: Partial<Session> = {}): 
   version: "1",
   time,
   ...input,
+})
+
+const cat = (id: string, key: SessionCatalog["key"]): SessionCatalog => ({
+  id,
+  projectID: "project",
+  directory: "/repo",
+  name: id,
+  icon: "folder",
+  key,
+  sort: 0,
+  time: { created: 0, updated: 0 },
 })
 
 describe("archivedList", () => {
@@ -50,5 +61,13 @@ describe("movable", () => {
     expect(movable("archived")).toBe(false)
     expect(movable("temp")).toBe(true)
     expect(movable(undefined)).toBe(true)
+  })
+})
+
+describe("catalogs", () => {
+  test("keeps archived catalog last", () => {
+    const list = [cat("archived", "archived"), cat("temp", "temp"), cat("analysis", "analysis")]
+
+    expect(catalogs(list).map((cat) => cat.id)).toEqual(["temp", "analysis", "archived"])
   })
 })

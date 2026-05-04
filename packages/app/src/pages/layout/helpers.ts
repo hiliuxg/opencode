@@ -41,6 +41,9 @@ export const latestRootSession = (stores: SessionStore[], now: number) =>
 
 export const movable = (key: SessionCatalog["key"] | undefined) => key !== "archived"
 
+export const catalogs = (list: SessionCatalog[]) =>
+  list.slice().sort((a, b) => Number(a.key === "archived") - Number(b.key === "archived"))
+
 const stamp = (session: Session) => session.time.updated ?? session.time.created
 
 const sort = (list: Session[]) =>

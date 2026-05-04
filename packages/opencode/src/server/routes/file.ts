@@ -285,6 +285,32 @@ export const FileRoutes = lazy(() =>
         return c.json(true)
       },
     )
+    .post(
+      "/file/copy",
+      describeRoute({
+        summary: "Copy file or directory",
+        description: "Copy a file or directory recursively. If the destination exists, a copy suffix is added.",
+        operationId: "file.copy",
+        responses: {
+          200: {
+            description: "Copied path",
+            content: { "application/json": { schema: resolver(z.object({ path: z.string() })) } },
+          },
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          srcPath: z.string(),
+          dstPath: z.string(),
+        }),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        const path = await File.copy(body.srcPath, body.dstPath)
+        return c.json({ path })
+      },
+    )
     .get(
       "/file/share",
       describeRoute({

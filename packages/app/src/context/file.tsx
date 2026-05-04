@@ -279,6 +279,13 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       if (dst !== parentDir(old)) void tree.listDir(dst, { force: true })
     }
 
+    const copyOp = async (src: string, dst: string) => {
+      const result = await sdk.client.file.copy({ srcPath: src, dstPath: dst })
+      const path = result.data?.path ?? dst
+      void tree.listDir(parentDir(path), { force: true })
+      return path
+    }
+
     const upload = async (files: { path: string; content: string; encoding?: "base64" }[]) => {
       const dirs = new Set<string>()
       for (const f of files) {
@@ -336,6 +343,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       normalize: path.normalize,
       tab: path.tab,
       pathFromTab: path.pathFromTab,
+      absolute: path.absolute,
       tree: {
         list: tree.listDir,
         refresh: (input: string) => tree.listDir(input, { force: true }),
@@ -366,6 +374,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       remove,
       rename: renameOp,
       upload,
+      copy: copyOp,
       download: downloadFile,
       serveUrl,
       share,

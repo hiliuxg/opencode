@@ -21,7 +21,7 @@ import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
 import { Persist, persisted } from "@/utils/persist"
 import { sessionPermissionRequest } from "../session/composer/session-request-tree"
-import { archivedList, movable, workspaceKey } from "./helpers"
+import { archivedList, catalogs, movable, workspaceKey } from "./helpers"
 
 type Props = {
   project: Accessor<LocalProject | undefined>
@@ -34,7 +34,7 @@ type Props = {
   hovering: Accessor<boolean>
   mobile?: boolean
   chooseProject: () => void
-  openNew: (dir: string) => void
+  openNew: (dir: string, opts?: { catalogID?: string }) => void
   openSession: (session: Session) => void
   prefetchSession: (session: Session, priority?: "high" | "low") => void
   archiveSession: (session: Session, input?: { catalogID?: string; pinned?: boolean }) => Promise<void>
@@ -154,7 +154,7 @@ export function ConversationSidebar(props: Props) {
       return
     })
     if (token !== catrev.value || !result) return
-    const list = result.data ?? []
+    const list = catalogs(result.data ?? [])
     setCats(list)
     if (!list.some((cat) => cat.id === state.cat)) setState("cat", list[0]?.id ?? "")
   }
@@ -280,7 +280,7 @@ export function ConversationSidebar(props: Props) {
     if (!result?.data) return false
     const data = result.data
     if (!cat) {
-      setCats((list) => [...list, data])
+      setCats((list) => catalogs([...list, data]))
       setState("cat", data.id)
       return true
     }
@@ -767,6 +767,8 @@ export function ConversationSidebar(props: Props) {
                   onClick={() => {
                     const next = dir()
                     if (!next) return
+                    const cat = tempcat()
+                    if (cat) setState("cat", cat.id)
                     props.openNew(next)
                   }}
                 />
@@ -881,6 +883,15 @@ export function ConversationSidebar(props: Props) {
                               />
                               <DropdownMenu.Portal>
                                 <DropdownMenu.Content>
+                                  <DropdownMenu.Item
+                                    onSelect={() => {
+                                      const next = dir()
+                                      if (!next) return
+                                      props.openNew(next, { catalogID: cat.id })
+                                    }}
+                                  >
+                                    <DropdownMenu.ItemLabel>{language.t("command.session.new")}</DropdownMenu.ItemLabel>
+                                  </DropdownMenu.Item>
                                   <DropdownMenu.Item onSelect={() => showCat(cat)}>
                                     <DropdownMenu.ItemLabel>{language.t("common.rename")}</DropdownMenu.ItemLabel>
                                   </DropdownMenu.Item>

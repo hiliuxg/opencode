@@ -2502,7 +2502,11 @@ export default function Layout(props: ParentProps) {
           hovering={sidebarHovering}
           mobile={mobile}
           chooseProject={chooseProject}
-          openNew={(directory) => navigateWithSidebarReset(`/${base64Encode(directory)}/session`)}
+          openNew={(directory, opts) =>
+            navigateWithSidebarReset(
+              `/${base64Encode(directory)}/session${opts?.catalogID ? `?catalog=${encodeURIComponent(opts.catalogID)}` : ""}`,
+            )
+          }
           openSession={navigateToSession}
           prefetchSession={prefetchSession}
           archiveSession={archiveSession}
@@ -2649,7 +2653,11 @@ export default function Layout(props: ParentProps) {
                   merged={() => false}
                   hovering={sidebarHovering}
                   chooseProject={chooseProject}
-                  openNew={(directory) => navigateWithSidebarReset(`/${base64Encode(directory)}/session`)}
+                  openNew={(directory, opts) =>
+                    navigateWithSidebarReset(
+                      `/${base64Encode(directory)}/session${opts?.catalogID ? `?catalog=${encodeURIComponent(opts.catalogID)}` : ""}`,
+                    )
+                  }
                   openSession={navigateToSession}
                   prefetchSession={prefetchSession}
                   archiveSession={archiveSession}

@@ -31,6 +31,7 @@ import type {
   ExperimentalWorkspaceListResponses,
   ExperimentalWorkspaceRemoveErrors,
   ExperimentalWorkspaceRemoveResponses,
+  FileCopyResponses,
   FileDeleteResponses,
   FileDownloadResponses,
   FileListResponses,
@@ -3251,6 +3252,45 @@ export class File extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<FileRenameResponses, unknown, ThrowOnError>({
       url: "/file/rename",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Copy file or directory
+   *
+   * Copy a file or directory recursively. If the destination exists, a copy suffix is added.
+   */
+  public copy<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      name?: string
+      srcPath?: string
+      dstPath?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "name" },
+            { in: "body", key: "srcPath" },
+            { in: "body", key: "dstPath" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileCopyResponses, unknown, ThrowOnError>({
+      url: "/file/copy",
       ...options,
       ...params,
       headers: {

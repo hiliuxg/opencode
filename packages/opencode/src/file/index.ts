@@ -344,6 +344,7 @@ export namespace File {
     readonly mkdir: (dir: string) => Effect.Effect<void, any>
     readonly remove: (target: string) => Effect.Effect<void, any>
     readonly rename: (old: string, next: string) => Effect.Effect<void, any>
+    readonly copy: (src: string, dst: string) => Effect.Effect<string, unknown>
     readonly serve: (file: string) => Effect.Effect<{ data: Uint8Array; mime: string }, any>
     readonly download: (target: string) => Effect.Effect<{ data: Uint8Array; filename: string; mime: string }, any>
   }
@@ -721,6 +722,40 @@ export namespace File {
         yield* Effect.promise(() => fs.promises.rename(src, dst))
       })
 
+      const copy = Effect.fn("File.copy")(function* (from: string, to: string) {
+        const src = forbidden(from)
+        const out = forbidden(to)
+        const stat = yield* Effect.promise(() => fs.promises.stat(src))
+        const dst = yield* Effect.promise(async () => {
+          const ext = stat.isDirectory() ? "" : path.extname(out)
+          const base = stat.isDirectory() ? path.basename(out) : path.basename(out, ext)
+          const dir = path.dirname(out)
+          const next = (idx: number) => {
+            if (idx === 0) return out
+            const suffix = idx === 1 ? " copy" : ` copy ${idx}`
+            return path.join(dir, `${base}${suffix}${ext}`)
+          }
+          for (let idx = 0; ; idx++) {
+            const file = next(idx)
+            const exists = await fs.promises
+              .stat(file)
+              .then(() => true)
+              .catch(() => false)
+            if (!exists) return file
+          }
+        })
+
+        if (stat.isDirectory()) {
+          const rel = path.relative(src, dst)
+          if (rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel)))
+            throw new Error("Cannot copy a directory into itself")
+        }
+
+        yield* appFs.makeDirectory(path.dirname(dst), { recursive: true }).pipe(Effect.catch(() => Effect.void))
+        yield* Effect.promise(() => fs.promises.cp(src, dst, { recursive: true, errorOnExist: true, force: false }))
+        return path.relative(Instance.directory, dst)
+      })
+
       const serve = Effect.fn("File.serve")(function* (file: string) {
         const full = path.join(Instance.directory, file)
         if (!Instance.containsPath(full)) throw new Error("Access denied: path escapes project directory")
@@ -757,7 +792,7 @@ export namespace File {
         return { data, filename: path.basename(full), mime: AppFileSystem.mimeType(full) }
       })
 
-      return Service.of({ init, status, read, list, search, write, mkdir, remove, rename, serve, download })
+      return Service.of({ init, status, read, list, search, write, mkdir, remove, rename, copy, serve, download })
     }),
   )
 
@@ -799,6 +834,10 @@ export namespace File {
 
   export async function rename(old: string, next: string) {
     return runPromise((svc) => svc.rename(old, next))
+  }
+
+  export async function copy(src: string, dst: string) {
+    return runPromise((svc) => svc.copy(src, dst))
   }
 
   export async function serve(file: string) {

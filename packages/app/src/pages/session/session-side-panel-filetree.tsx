@@ -14,7 +14,14 @@ import type { DragEvent as SolidDndDragEvent } from "@thisbeyond/solid-dnd"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
-import FileTree, { type FileTreeOps } from "@/components/file-tree"
+import FileTree, {
+  clipboardPath,
+  pasteBlocked,
+  pasteTarget,
+  type FileTreeClip,
+  type FileTreeClipState,
+  type FileTreeOps,
+} from "@/components/file-tree"
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { SessionContextTab, SortableTab, FileVisual } from "@/components/session"
 import { useCommand } from "@/context/command"
@@ -345,6 +352,14 @@ export function SessionSidePanel(props: {
     })
   }
 
+  const [clip, setClip] = createSignal<FileTreeClip | null>(null)
+  const treeClip: FileTreeClipState = { value: clip, set: (next) => setClip(next) }
+  const treeKey = (p: string) =>
+    file
+      .normalize(p)
+      .replace(/[\\/]+$/, "")
+      .replaceAll("\\", "/")
+
   const fileTreeOps: FileTreeOps = {
     onRename: async (node, next) => {
       await file.rename(node.path, next).catch((err: unknown) => {
@@ -395,24 +410,19 @@ export function SessionSidePanel(props: {
         })
       })
     },
-    onCopy: async (node) => {
-      try {
-        const resp = await fetch(file.serveUrl(node.path))
-        if (!resp.ok) throw new Error("Read failed")
-        const text = await resp.text()
-        const p = node.path
-        const dot = p.lastIndexOf(".")
-        const slash = p.lastIndexOf("/")
-        const dst = dot > slash ? p.slice(0, dot) + "_copy" + p.slice(dot) : p + "_copy"
-        await file.write(dst, text)
-        showToast({ title: language.t("fileTree.toast.copySuccess") })
-      } catch (err) {
-        showToast({
-          variant: "error",
-          title: language.t("fileTree.toast.copyFailed"),
-          description: err instanceof Error ? err.message : String(err),
+    onCopy: async (src, dst) => {
+      await file
+        .copy(src, dst)
+        .then(() => {
+          showToast({ title: language.t("fileTree.toast.copySuccess") })
         })
-      }
+        .catch((err: unknown) => {
+          showToast({
+            variant: "error",
+            title: language.t("fileTree.toast.copyFailed"),
+            description: err instanceof Error ? err.message : String(err),
+          })
+        })
     },
     onPreview: (node) => {
       window.open(file.serveUrl(node.path), "_blank")
@@ -459,6 +469,42 @@ export function SessionSidePanel(props: {
         showToast({ title: language.t("fileTree.upload.success") })
       }
     },
+  }
+
+  const pasteRoot = () => {
+    const board = typeof navigator === "undefined" ? undefined : navigator.clipboard
+    if (!board?.readText) {
+      showToast({ variant: "error", title: language.t("fileTree.toast.pasteFailed") })
+      return
+    }
+    void board
+      .readText()
+      .then((text) => {
+        const raw = clipboardPath(text)
+        if (!raw) throw new Error(language.t("fileTree.toast.clipboardEmpty"))
+        const src = treeKey(raw)
+        const current = clip()
+        const op = current?.path === src ? current.op : "copy"
+        if (current && current.path !== src) setClip(null)
+        if (pasteBlocked({ op, src, dir: "" })) throw new Error(language.t("fileTree.toast.pasteBlocked"))
+        const dst = pasteTarget({ src, dir: "" })
+        if (op === "cut" && src === dst) {
+          setClip(null)
+          return
+        }
+        const fn = op === "cut" ? fileTreeOps.onMove : fileTreeOps.onCopy
+        if (!fn) throw new Error(language.t("fileTree.toast.pasteUnavailable"))
+        return Promise.resolve(fn(src, dst)).then(() => {
+          if (op === "cut") setClip(null)
+        })
+      })
+      .catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.pasteFailed"),
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
   }
 
   createEffect(() => {
@@ -728,6 +774,7 @@ export function SessionSidePanel(props: {
                             active={path()}
                             onFileClick={(node) => openTab(file.tab(node.path))}
                             ops={fileTreeOps}
+                            clip={treeClip}
                           />
                         </Match>
                       </Switch>
@@ -741,6 +788,10 @@ export function SessionSidePanel(props: {
                         <ContextMenu.Item onSelect={() => setRootCreate("folder")}>
                           <Icon name="folder-add-left" />
                           <ContextMenu.ItemLabel>{language.t("fileTree.toolbar.newFolder")}</ContextMenu.ItemLabel>
+                        </ContextMenu.Item>
+                        <ContextMenu.Item onSelect={pasteRoot}>
+                          <Icon name="arrow-down-to-line" />
+                          <ContextMenu.ItemLabel>{language.t("fileTree.menu.paste")}</ContextMenu.ItemLabel>
                         </ContextMenu.Item>
                         <ContextMenu.Separator />
                         <ContextMenu.Item onSelect={() => file.tree.refresh("")}>

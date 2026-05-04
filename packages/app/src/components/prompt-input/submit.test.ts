@@ -5,6 +5,7 @@ let createPromptSubmit: typeof import("./submit").createPromptSubmit
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
+const updated: Array<{ directory: string; sessionID: string; catalogID: string | null }> = []
 const enabledAutoAccept: Array<{ sessionID: string; directory: string }> = []
 const optimistic: Array<{
   directory?: string
@@ -16,12 +17,13 @@ const optimistic: Array<{
   }
 }> = []
 const optimisticSeeded: boolean[] = []
-const storedSessions: Record<string, Array<{ id: string; title?: string }>> = {}
+const storedSessions: Record<string, Array<{ id: string; title?: string; catalogID?: string }>> = {}
 const promoted: Array<{ directory: string; sessionID: string }> = []
 const sentShell: string[] = []
 const syncedDirectories: string[] = []
 
 let params: { id?: string } = {}
+let search: { catalog?: string } = {}
 let selected = "/repo/worktree-a"
 let variant: string | undefined
 
@@ -37,6 +39,16 @@ const clientFor = (directory: string) => {
           data: {
             id: `session-${createdSessions.length}`,
             title: `New session ${createdSessions.length}`,
+          },
+        }
+      },
+      update: async (input: { sessionID: string; catalogID: string | null }) => {
+        updated.push({ directory, sessionID: input.sessionID, catalogID: input.catalogID })
+        return {
+          data: {
+            id: input.sessionID,
+            title: `New session ${createdSessions.length}`,
+            catalogID: input.catalogID ?? undefined,
           },
         }
       },
@@ -61,6 +73,7 @@ beforeAll(async () => {
   mock.module("@solidjs/router", () => ({
     useNavigate: () => () => undefined,
     useParams: () => params,
+    useSearchParams: () => [search],
   }))
 
   mock.module("@opencode-ai/sdk/v2/client", () => ({
@@ -86,6 +99,10 @@ beforeAll(async () => {
       },
       agent: {
         current: () => ({ name: "agent" }),
+      },
+      skill: {
+        current: () => [],
+        set: () => undefined,
       },
       session: {
         promote(directory: string, sessionID: string) {
@@ -173,11 +190,15 @@ beforeAll(async () => {
             if (args[0] !== "session") return
             const next = args[1]
             if (typeof next === "function") {
-              storedSessions[directory] = next(storedSessions[directory]) as Array<{ id: string; title?: string }>
+              storedSessions[directory] = next(storedSessions[directory]) as Array<{
+                id: string
+                title?: string
+                catalogID?: string
+              }>
               return
             }
             if (Array.isArray(next)) {
-              storedSessions[directory] = next as Array<{ id: string; title?: string }>
+              storedSessions[directory] = next as Array<{ id: string; title?: string; catalogID?: string }>
             }
           },
         ]
@@ -204,11 +225,13 @@ beforeAll(async () => {
 beforeEach(() => {
   createdClients.length = 0
   createdSessions.length = 0
+  updated.length = 0
   enabledAutoAccept.length = 0
   optimistic.length = 0
   optimisticSeeded.length = 0
   promoted.length = 0
   params = {}
+  search = {}
   sentShell.length = 0
   syncedDirectories.length = 0
   selected = "/repo/worktree-a"
@@ -342,5 +365,34 @@ describe("prompt submit worktree selection", () => {
 
     expect(storedSessions["/repo/worktree-a"]).toEqual([{ id: "session-1", title: "New session 1" }])
     expect(optimisticSeeded).toEqual([true])
+  })
+
+  test("assigns new sessions to the requested catalog", async () => {
+    search = { catalog: "cat_123" }
+
+    const submit = createPromptSubmit({
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onNewSessionWorktreeReset: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+
+    expect(updated).toEqual([{ directory: "/repo/main", sessionID: "session-1", catalogID: "cat_123" }])
+    expect(storedSessions["/repo/main"]).toEqual([
+      { id: "session-1", title: "New session 1", catalogID: "cat_123" },
+    ])
   })
 })

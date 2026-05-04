@@ -101,6 +101,19 @@ export function encodeFilePath(filepath: string): string {
     .join("/")
 }
 
+export function absolute(root: string, file: string) {
+  if (!root) return file
+  if (!file) return root
+  if (file.startsWith("/") || file.startsWith("\\\\") || file.startsWith("//") || /^[A-Za-z]:[\\/]/.test(file))
+    return file
+
+  const sep = root.includes("\\") && !root.includes("/") ? "\\" : "/"
+  const dir = root.replace(/[\\/]+$/, "")
+  const rel = file.replace(/^[\\/]+/, "")
+  const next = sep === "\\" ? rel.replace(/\//g, "\\") : rel
+  return `${dir}${sep}${next}`
+}
+
 export function createPathHelpers(scope: () => string) {
   const normalize = (input: string) => {
     const root = scope()
@@ -141,11 +154,13 @@ export function createPathHelpers(scope: () => string) {
   }
 
   const normalizeDir = (input: string) => normalize(input).replace(/\/+$/, "")
+  const resolve = (input: string) => absolute(scope(), normalize(input))
 
   return {
     normalize,
     tab,
     pathFromTab,
     normalizeDir,
+    absolute: resolve,
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createPathHelpers, stripQueryAndHash, unquoteGitPath, encodeFilePath } from "./path"
+import { absolute, createPathHelpers, stripQueryAndHash, unquoteGitPath, encodeFilePath } from "./path"
 
 describe("file path helpers", () => {
   test("normalizes file inputs against workspace root", () => {
@@ -19,6 +19,14 @@ describe("file path helpers", () => {
     expect(path.normalize("C:/repo/src/app.ts")).toBe("src/app.ts")
     expect(path.normalize("file://C:/repo/src/app.ts")).toBe("src/app.ts")
     expect(path.normalize("c:\\repo\\src\\app.ts")).toBe("src\\app.ts")
+  })
+
+  test("resolves file tabs to absolute paths", () => {
+    expect(absolute("/repo", "src/app.ts")).toBe("/repo/src/app.ts")
+    expect(absolute("/repo/", "/tmp/app.ts")).toBe("/tmp/app.ts")
+    expect(absolute("C:\\repo", "src\\app.ts")).toBe("C:\\repo\\src\\app.ts")
+    expect(absolute("C:\\repo", "src/app.ts")).toBe("C:\\repo\\src\\app.ts")
+    expect(absolute("C:\\repo", "D:\\tmp\\app.ts")).toBe("D:\\tmp\\app.ts")
   })
 
   test("keeps query/hash stripping behavior stable", () => {

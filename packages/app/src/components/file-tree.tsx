@@ -36,6 +36,37 @@ type Filter = {
   dirs: Set<string>
 }
 
+export type FileTreeClip = {
+  op: "copy" | "cut"
+  path: string
+}
+
+export type FileTreeClipState = {
+  value: () => FileTreeClip | null
+  set: (clip: FileTreeClip | null) => void
+}
+
+export function clipboardPath(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+}
+
+export function pasteTarget(input: { src: string; dir: string }) {
+  const idx = input.src.lastIndexOf("/")
+  const name = idx === -1 ? input.src : input.src.slice(idx + 1)
+  return input.dir ? `${input.dir}/${name}` : name
+}
+
+export function pasteBlocked(input: { op: "copy" | "cut"; src: string; dir: string }) {
+  if (input.op !== "cut") return false
+  if (input.src === input.dir) return true
+  return input.dir.startsWith(input.src + "/")
+}
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
 export function shouldListRoot(input: { level: number; dir?: { loaded?: boolean; loading?: boolean } }) {
   if (input.level !== 0) return false
   if (input.dir?.loaded) return false
@@ -175,6 +206,7 @@ const FileTreeNode = (
       marks?: Set<string>
       as?: "div" | "button"
       dropTarget?: boolean
+      cut?: boolean
     },
 ) => {
   const [local, rest] = splitProps(p, [
@@ -190,6 +222,7 @@ const FileTreeNode = (
     "class",
     "classList",
     "dropTarget",
+    "cut",
   ])
   const kind = () => visibleKind(local.node, local.kinds, local.marks)
   const active = () => !!kind() && !local.node.ignored
@@ -206,6 +239,7 @@ const FileTreeNode = (
         "w-full min-w-0 h-6 flex items-center justify-start gap-x-1.5 rounded-md px-1.5 py-0 text-left hover:bg-surface-raised-base-hover active:bg-surface-base-active transition-colors cursor-pointer": true,
         "bg-surface-base-active": local.node.path === local.active,
         "ring-1 ring-border-focus": !!local.dropTarget,
+        "opacity-50": !!local.cut,
         ...(local.classList ?? {}),
         [local.class ?? ""]: !!local.class,
         [local.nodeClass ?? ""]: !!local.nodeClass,
@@ -255,9 +289,9 @@ export type FileTreeOps = {
   onDeleteMany?: (nodes: { path: string }[]) => void
   onNewFile?: (dir: string, name: string) => void
   onNewFolder?: (dir: string, name: string) => void
-  onMove?: (src: string, dst: string) => void
+  onMove?: (src: string, dst: string) => void | Promise<void>
   onDownload?: (node: FileNode) => void
-  onCopy?: (node: FileNode) => void
+  onCopy?: (src: string, dst: string) => void | Promise<void>
   onPreview?: (node: FileNode) => void
   onShare?: (node: FileNode) => void
   onUpload?: (dir: string, items: DataTransferItemList) => void
@@ -275,17 +309,23 @@ export default function FileTree(props: {
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
   ops?: FileTreeOps
+  clip?: FileTreeClipState
 
   _filter?: Filter
   _marks?: Set<string>
   _deeps?: Map<string, number>
   _kinds?: ReadonlyMap<string, Kind>
   _chain?: readonly string[]
+  _clip?: FileTreeClipState
 }) {
   const file = useFile()
   const language = useLanguage()
   const level = props.level ?? 0
   const draggable = () => props.draggable ?? true
+  const [localClip, setLocalClip] = createSignal<FileTreeClip | null>(null)
+  const clip = props.clip?.value ?? props._clip?.value ?? localClip
+  const setClip = props.clip?.set ?? props._clip?.set ?? ((next: FileTreeClip | null) => setLocalClip(next))
+  const state = { value: clip, set: setClip }
 
   const key = (p: string) =>
     file
@@ -502,6 +542,67 @@ export default function FileTree(props: {
     props.ops?.onUpload?.(dirPath, items)
   }
 
+  const writeClip = (node: FileNode, op: FileTreeClip["op"]) => {
+    const board = typeof navigator === "undefined" ? undefined : navigator.clipboard
+    if (!board?.writeText) {
+      showToast({ variant: "error", title: language.t("fileTree.toast.clipboardFailed") })
+      return
+    }
+    void board
+      .writeText(node.path)
+      .then(() => {
+        setClip({ op, path: key(node.path) })
+        showToast({
+          title: language.t(op === "cut" ? "fileTree.toast.cutReady" : "fileTree.toast.copyReady"),
+        })
+      })
+      .catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.clipboardFailed"),
+          description: errorText(err),
+        })
+      })
+  }
+
+  const paste = (dir: string) => {
+    const board = typeof navigator === "undefined" ? undefined : navigator.clipboard
+    if (!board?.readText) {
+      showToast({ variant: "error", title: language.t("fileTree.toast.pasteFailed") })
+      return
+    }
+    void board
+      .readText()
+      .then((text) => {
+        const raw = clipboardPath(text)
+        if (!raw) throw new Error(language.t("fileTree.toast.clipboardEmpty"))
+        const src = key(file.normalize(raw))
+        const current = clip()
+        const op = current?.path === src ? current.op : "copy"
+        if (current && current.path !== src) setClip(null)
+        const dst = pasteTarget({ src, dir: key(dir) })
+        if (pasteBlocked({ op, src, dir: key(dir) })) throw new Error(language.t("fileTree.toast.pasteBlocked"))
+        if (op === "cut" && src === dst) {
+          setClip(null)
+          return
+        }
+        const fn = op === "cut" ? props.ops?.onMove : props.ops?.onCopy
+        if (!fn) throw new Error(language.t("fileTree.toast.pasteUnavailable"))
+        return Promise.resolve(fn(src, dst)).then(() => {
+          if (op === "cut") setClip(null)
+        })
+      })
+      .catch((err: unknown) => {
+        showToast({
+          variant: "error",
+          title: language.t("fileTree.toast.pasteFailed"),
+          description: errorText(err),
+        })
+      })
+  }
+
+  const cut = (node: FileNode) => clip()?.op === "cut" && clip()?.path === key(node.path)
+
   const fileMenu = (node: FileNode) => (
     <>
       <ContextMenu.Item onSelect={() => props.onFileClick?.(node)}>
@@ -512,9 +613,13 @@ export default function FileTree(props: {
         <Icon name="download" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.download")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
-      <ContextMenu.Item onSelect={() => props.ops?.onCopy?.(node)}>
+      <ContextMenu.Item onSelect={() => writeClip(node, "copy")}>
         <Icon name="copy" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.copy")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => writeClip(node, "cut")}>
+        <Icon name="arrow-right" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.cut")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "rename" })}>
         <Icon name="pencil-line" />
@@ -543,6 +648,18 @@ export default function FileTree(props: {
       <ContextMenu.Item onSelect={() => props.ops?.onDownload?.(node)}>
         <Icon name="download" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.download")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => writeClip(node, "copy")}>
+        <Icon name="copy" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.copy")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => writeClip(node, "cut")}>
+        <Icon name="arrow-right" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.cut")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => paste(node.path)}>
+        <Icon name="arrow-down-to-line" />
+        <ContextMenu.ItemLabel>{language.t("fileTree.menu.paste")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
       <ContextMenu.Separator />
       <ContextMenu.Item onSelect={() => setEditing({ path: node.path, type: "newFile" })}>
@@ -651,6 +768,7 @@ export default function FileTree(props: {
       draggable={draggable()}
       kinds={kinds()}
       marks={marks()}
+      cut={cut(node)}
       as="button"
       type="button"
       onClick={() => props.onFileClick?.(node)}
@@ -690,6 +808,7 @@ export default function FileTree(props: {
             draggable={draggable()}
             kinds={kinds()}
             marks={marks()}
+            cut={cut(node)}
             dropTarget={dropTarget() === node.path}
             onDragOver={(e: DragEvent) => handleDirDragOver(node.path, e)}
             onDragLeave={() => handleDirDragLeave(node.path)}
@@ -736,6 +855,7 @@ export default function FileTree(props: {
             _deeps={deeps()}
             _kinds={kinds()}
             _chain={chain}
+            _clip={state}
           />
         </Show>
       </Collapsible.Content>

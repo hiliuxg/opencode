@@ -4641,6 +4641,30 @@ export type FileRenameResponses = {
 
 export type FileRenameResponse = FileRenameResponses[keyof FileRenameResponses]
 
+export type FileCopyData = {
+  body?: {
+    srcPath: string
+    dstPath: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    name?: string
+  }
+  url: "/file/copy"
+}
+
+export type FileCopyResponses = {
+  /**
+   * Copied path
+   */
+  200: {
+    path: string
+  }
+}
+
+export type FileCopyResponse = FileCopyResponses[keyof FileCopyResponses]
+
 export type FileShareData = {
   body?: never
   path?: never
