@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, batch, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
@@ -31,7 +31,7 @@ import { useLayout } from "@/context/layout"
 import { useSync } from "@/context/sync"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
-import { createOpenSessionFileTab, createSessionTabs, getTabReorderIndex, type Sizing } from "@/pages/session/helpers"
+import { closePlan, createOpenSessionFileTab, createSessionTabs, getTabReorderIndex, type Sizing } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import type { FileNode } from "@opencode-ai/sdk/v2"
@@ -208,6 +208,13 @@ export function SessionSidePanel(props: {
     if (!tab) return
     return file.pathFromTab(tab)
   })
+  const closeTabs = (mode: "all" | "others", target: string) => {
+    const plan = closePlan({ tabs: tabs().all(), target, active: tabs().active(), mode })
+    batch(() => {
+      tabs().setAll(plan.all)
+      tabs().setActive(plan.active)
+    })
+  }
 
   const fileTreeTab = () => layout.fileTree.tab()
 
@@ -609,7 +616,17 @@ export function SessionSidePanel(props: {
                       </Show>
                       <SortableProvider ids={openedTabs()}>
                         <For each={openedTabs()}>
-                          {(tab) => <SortableTab tab={tab} onTabClose={tabs().close} />}
+                          {(tab) => (
+                            <SortableTab
+                              tab={tab}
+                              onTabClose={tabs().close}
+                              menu={{
+                                many: () => openedTabs().length > 1,
+                                onCloseAll: (tab) => closeTabs("all", tab),
+                                onCloseOthers: (tab) => closeTabs("others", tab),
+                              }}
+                            />
+                          )}
                         </For>
                       </SortableProvider>
                       <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">

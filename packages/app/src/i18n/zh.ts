@@ -511,6 +511,8 @@ export const dict = {
   "session.tab.session": "会话",
   "session.tab.review": "文件变更",
   "session.tab.context": "上下文",
+  "session.tab.closeAll": "全部关闭",
+  "session.tab.closeOthers": "关闭其他",
   "session.panel.reviewAndFiles": "审查和文件",
   "session.review.filesChanged": "{{count}} 个文件变更",
   "session.review.change.one": "更改",

@@ -14,6 +14,11 @@ export const workspaceKey = (directory: string) => {
   return value.replace(/\/+$/, "")
 }
 
+export const shouldNotify = (active: string | undefined, dir: string) => {
+  if (!active) return false
+  return workspaceKey(active) === workspaceKey(dir)
+}
+
 function sortSessions(now: number) {
   const oneMinuteAgo = now - 60 * 1000
   return (a: Session, b: Session) => {

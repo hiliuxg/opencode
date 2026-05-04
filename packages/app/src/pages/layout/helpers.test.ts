@@ -13,6 +13,7 @@ import {
   errorMessage,
   hasProjectPermissions,
   latestRootSession,
+  shouldNotify,
   workspaceKey,
 } from "./helpers"
 
@@ -113,6 +114,14 @@ describe("layout workspace helpers", () => {
     expect(workspaceKey("C:\\")).toBe("C:/")
     expect(workspaceKey("C://")).toBe("C:/")
     expect(workspaceKey("C:///")).toBe("C:/")
+  })
+
+  test("allows notifications only for the active workspace", () => {
+    expect(shouldNotify("/tmp/demo", "/tmp/demo")).toBe(true)
+    expect(shouldNotify("/tmp/demo///", "/tmp/demo")).toBe(true)
+    expect(shouldNotify("C:\\tmp\\demo", "C:/tmp/demo/")).toBe(true)
+    expect(shouldNotify("/tmp/other", "/tmp/demo")).toBe(false)
+    expect(shouldNotify("", "/tmp/demo")).toBe(false)
   })
 
   test("keeps local first while preserving known order", () => {

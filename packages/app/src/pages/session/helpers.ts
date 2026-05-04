@@ -150,6 +150,21 @@ export const getTabReorderIndex = (tabs: readonly string[], from: string, to: st
   return toIndex
 }
 
+export function closePlan(input: {
+  tabs: readonly string[]
+  target: string
+  active?: string
+  mode: "all" | "others"
+}) {
+  const file = (tab: string) => tab !== "context" && tab !== "review"
+  const drop = new Set(input.tabs.filter((tab) => file(tab) && (input.mode === "all" || tab !== input.target)))
+  const all = input.tabs.filter((tab) => !drop.has(tab))
+
+  if (!input.active || all.includes(input.active)) return { all, active: input.active }
+  if (input.mode === "others" && all.includes(input.target)) return { all, active: input.target }
+  return { all, active: all[0] }
+}
+
 export const createSizing = () => {
   const [state, setState] = createStore({ active: false })
   let t: number | undefined

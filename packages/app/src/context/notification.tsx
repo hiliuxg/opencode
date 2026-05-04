@@ -13,6 +13,7 @@ import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
 import { playSoundById } from "@/utils/sound"
+import { shouldNotify } from "@/pages/layout/helpers"
 
 type NotificationBase = {
   directory?: string
@@ -233,11 +234,12 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         if (!session) return
         if (session.parentID) return
 
-        /*
-        if (settings.sounds.agentEnabled()) {
-          void playSoundById(settings.sounds.agent())
+        const notify = shouldNotify(currentDirectory(), directory)
+        if (notify) {
+          if (settings.sounds.agentEnabled()) {
+            void playSoundById(settings.sounds.agent())
+          }
         }
-        */
 
         append({
           directory,
@@ -247,12 +249,16 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
           session: sessionID,
         })
 
-        /*
-        const href = `/${base64Encode(directory)}/session/${sessionID}`
-        if (settings.notifications.agent()) {
-          void platform.notify(language.t("notification.session.responseReady.title"), session.title ?? sessionID, href)
+        if (notify) {
+          const href = `/${base64Encode(directory)}/session/${sessionID}`
+          if (settings.notifications.agent()) {
+            void platform.notify(
+              language.t("notification.session.responseReady.title"),
+              session.title ?? sessionID,
+              href,
+            )
+          }
         }
-        */
       })
     }
 
@@ -266,11 +272,12 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         if (meta.disposed) return
         if (session?.parentID) return
 
-        /*
-        if (settings.sounds.errorsEnabled()) {
-          void playSoundById(settings.sounds.errors())
+        const notify = shouldNotify(currentDirectory(), directory)
+        if (notify) {
+          if (settings.sounds.errorsEnabled()) {
+            void playSoundById(settings.sounds.errors())
+          }
         }
-        */
 
         const error = "error" in event.properties ? event.properties.error : undefined
         append({
@@ -281,15 +288,15 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
           session: sessionID ?? "global",
           error,
         })
-        /*
-        const description =
-          session?.title ??
-          (typeof error === "string" ? error : language.t("notification.session.error.fallbackDescription"))
-        const href = sessionID ? `/${base64Encode(directory)}/session/${sessionID}` : `/${base64Encode(directory)}`
-        if (settings.notifications.errors()) {
-          void platform.notify(language.t("notification.session.error.title"), description, href)
+        if (notify) {
+          const description =
+            session?.title ??
+            (typeof error === "string" ? error : language.t("notification.session.error.fallbackDescription"))
+          const href = sessionID ? `/${base64Encode(directory)}/session/${sessionID}` : `/${base64Encode(directory)}`
+          if (settings.notifications.errors()) {
+            void platform.notify(language.t("notification.session.error.title"), description, href)
+          }
         }
-        */
       })
     }
 

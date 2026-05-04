@@ -74,6 +74,7 @@ import {
   effectiveWorkspaceOrder,
   errorMessage,
   latestRootSession,
+  shouldNotify,
   sortedRootSessions,
   workspaceKey,
 } from "./layout/helpers"
@@ -493,13 +494,13 @@ export default function Layout(props: ParentProps) {
             ? language.t("notification.permission.description", { sessionTitle, projectName })
             : language.t("notification.question.description", { sessionTitle, projectName })
         const href = `/${base64Encode(directory)}/session/${props.sessionID}`
+        if (!shouldNotify(currentDir(), directory)) return
 
         const now = Date.now()
         const lastAlerted = alertedAtBySession.get(sessionKey) ?? 0
         if (now - lastAlerted < cooldownMs) return
         alertedAtBySession.set(sessionKey, now)
 
-        /*
         if (e.details.type === "permission.asked") {
           if (settings.sounds.permissionsEnabled()) {
             void playSoundById(settings.sounds.permissions())
@@ -514,7 +515,6 @@ export default function Layout(props: ParentProps) {
             void platform.notify(title, description, href)
           }
         }
-        */
 
         const currentSession = params.id
         if (workspaceKey(directory) === workspaceKey(currentDir()) && props.sessionID === currentSession) return
@@ -522,7 +522,6 @@ export default function Layout(props: ParentProps) {
 
         dismissSessionAlert(sessionKey)
 
-        /*
         const toastId = showToast({
           persistent: true,
           icon,
@@ -540,7 +539,6 @@ export default function Layout(props: ParentProps) {
           ],
         })
         toastBySession.set(sessionKey, toastId)
-        */
       })
       onCleanup(unsub)
 

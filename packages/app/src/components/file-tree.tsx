@@ -1,6 +1,7 @@
 import { useFile } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
 import { useLanguage } from "@/context/language"
+import { copyPath } from "@/utils/clipboard"
 import { Collapsible } from "@opencode-ai/ui/collapsible"
 import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
@@ -602,6 +603,16 @@ export default function FileTree(props: {
   }
 
   const cut = (node: FileNode) => clip()?.op === "cut" && clip()?.path === key(node.path)
+  const path = (node: FileNode) => {
+    void copyPath({
+      path: file.absolute(node.path),
+      labels: {
+        success: language.t("fileTree.toast.copyReady"),
+        fail: language.t("fileTree.toast.copyFailed"),
+      },
+      toast: showToast,
+    })
+  }
 
   const fileMenu = (node: FileNode) => (
     <>
@@ -616,6 +627,10 @@ export default function FileTree(props: {
       <ContextMenu.Item onSelect={() => writeClip(node, "copy")}>
         <Icon name="copy" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.copy")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => path(node)}>
+        <Icon name="copy" />
+        <ContextMenu.ItemLabel>{language.t("session.header.open.copyPath")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => writeClip(node, "cut")}>
         <Icon name="arrow-right" />
@@ -652,6 +667,10 @@ export default function FileTree(props: {
       <ContextMenu.Item onSelect={() => writeClip(node, "copy")}>
         <Icon name="copy" />
         <ContextMenu.ItemLabel>{language.t("fileTree.menu.copy")}</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => path(node)}>
+        <Icon name="copy" />
+        <ContextMenu.ItemLabel>{language.t("session.header.open.copyPath")}</ContextMenu.ItemLabel>
       </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => writeClip(node, "cut")}>
         <Icon name="arrow-right" />

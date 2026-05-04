@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createMemo, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
+  closePlan,
   createOpenReviewFile,
   createOpenSessionFileTab,
   createSessionTabs,
@@ -114,6 +115,36 @@ describe("getTabReorderIndex", () => {
 
   test("returns undefined for unknown droppable id", () => {
     expect(getTabReorderIndex(["a", "b", "c"], "a", "missing")).toBeUndefined()
+  })
+})
+
+describe("closePlan", () => {
+  test("closes every file tab without closing context", () => {
+    expect(
+      closePlan({
+        tabs: ["file://src/a.ts", "context", "file://src/b.ts"],
+        target: "file://src/a.ts",
+        active: "file://src/b.ts",
+        mode: "all",
+      }),
+    ).toEqual({
+      all: ["context"],
+      active: "context",
+    })
+  })
+
+  test("closes other file tabs and activates the target when active closes", () => {
+    expect(
+      closePlan({
+        tabs: ["file://src/a.ts", "context", "file://src/b.ts", "file://src/c.ts"],
+        target: "file://src/c.ts",
+        active: "file://src/b.ts",
+        mode: "others",
+      }),
+    ).toEqual({
+      all: ["context", "file://src/c.ts"],
+      active: "file://src/c.ts",
+    })
   })
 })
 
