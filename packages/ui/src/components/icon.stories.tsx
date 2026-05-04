@@ -58,6 +58,8 @@ const names = [
   "folder",
   "file-tree",
   "file-tree-active",
+  "file-plus",
+  "collapse-all",
   "magnifying-glass",
   "plus-small",
   "plus",

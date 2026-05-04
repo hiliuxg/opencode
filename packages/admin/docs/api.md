@@ -77,7 +77,7 @@
 *   **路径**: `POST /api/jobs/:id/run`
 *   **参数 (Path)**:
     *   `id`: 任务 ID。
-*   **返回**: `{ "ok": true, "message": "job triggered", "jobId": "..." }`
+*   **返回**: 执行完成后返回 `{ "ok": true, "message": "job completed", "jobId": "...", "result": { "ok": true, "sessionId": "...", "duration": 12345 } }`；如果并发已满进入队列，则返回 `{ "ok": true, "message": "job queued", "jobId": "..." }`。
 
 ## 3. 执行记录 (Executions)
 

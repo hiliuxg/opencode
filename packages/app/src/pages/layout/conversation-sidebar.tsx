@@ -761,7 +761,7 @@ export function ConversationSidebar(props: Props) {
                 <IconButton
                   icon="new-session"
                   variant="ghost"
-                  class="size-8 rounded-md"
+                  class="-mr-2 size-8 rounded-md"
                   disabled={!dir()}
                   aria-label={language.t("command.session.new")}
                   onClick={() => {

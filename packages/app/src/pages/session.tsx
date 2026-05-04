@@ -27,7 +27,7 @@ import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { MessageTimeline } from "@/pages/session/message-timeline"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { SessionComposerRegion, createSessionComposerState } from "@/pages/session/composer"
-import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { SessionSidePanel } from "@/pages/session/session-side-panel-filetree"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { setCursorPosition } from "@/components/prompt-input/editor-dom"
 

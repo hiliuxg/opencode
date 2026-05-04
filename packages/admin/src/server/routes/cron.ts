@@ -240,9 +240,9 @@ export function CronRoutes() {
         if (!existing) return c.json({ ok: false, error: "job_not_found" }, 404)
 
         Log.Default.info(`[CronRoutes] manual trigger for job=${id}`)
-        executor.enqueue(String(id))
+        const result = await executor.enqueue(String(id))
 
-        return c.json({ ok: true, message: "job triggered", jobId: id })
+        return c.json({ ok: true, message: result ? "job completed" : "job queued", jobId: id, result })
     })
 
     return app

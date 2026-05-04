@@ -32,7 +32,7 @@ export class Executor {
     }
 
     /** Enqueue a job for execution */
-    async enqueue(jobId: string | number) {
+    async enqueue(jobId: string | number): Promise<ExecutionResult | undefined> {
         if (this.running >= this.concurrency) {
             Log.Default.info(`[Executor] queued job=${jobId} (running=${this.running}/${this.concurrency})`)
             this.queue.push(String(jobId))
@@ -41,7 +41,7 @@ export class Executor {
 
         this.running++
         try {
-            await this.execute(jobId)
+            return await this.execute(jobId)
         } finally {
             this.running--
             this.processQueue()
@@ -154,7 +154,7 @@ export class Executor {
     /**
      * Call opencode serve to:
      * 1. Create a new session
-     * 2. Send the prompt asynchronously
+     * 2. Send the prompt and wait until the response stream is complete
      */
     private async callOpencode(
         user: typeof users.$inferSelect,
@@ -219,8 +219,8 @@ export class Executor {
             promptBody.agent = config.agent
         }
 
-        // Step 3: Send prompt async (fire-and-forget style, returns 204)
-        const promptRes = await fetch(`${baseUrl}/session/${sessionId}/prompt_async`, {
+        // Step 3: Send prompt and consume the stream so duration covers the full run
+        const promptRes = await fetch(`${baseUrl}/session/${sessionId}/message`, {
             method: "POST",
             headers,
             body: JSON.stringify(promptBody),
@@ -231,6 +231,8 @@ export class Executor {
             const text = await promptRes.text().catch(() => "")
             throw new Error(`Failed to send prompt: ${promptRes.status} ${text}`)
         }
+
+        await promptRes.text()
 
         return { sessionId }
     }
