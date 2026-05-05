@@ -1851,6 +1851,20 @@ export type SessionCatalog = {
   }
 }
 
+export type SessionCatalogCount = {
+  catalogID: string
+  count: number
+}
+
+export type SessionCatalogCounts = Array<SessionCatalogCount>
+
+export type SessionCatalogSessions = {
+  pinned: Array<Session>
+  items: Array<Session>
+  count: number
+  nextCursor?: string
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -3107,6 +3121,83 @@ export type SessionCatalogCreateResponses = {
 }
 
 export type SessionCatalogCreateResponse = SessionCatalogCreateResponses[keyof SessionCatalogCreateResponses]
+
+export type SessionCatalogCountsData = {
+  body?: never
+  path?: never
+  query: {
+    /**
+     * Project directory for the catalog
+     */
+    directory: string
+    name?: string
+  }
+  url: "/session/catalog/counts"
+}
+
+export type SessionCatalogCountsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionCatalogCountsError = SessionCatalogCountsErrors[keyof SessionCatalogCountsErrors]
+
+export type SessionCatalogCountsResponses = {
+  /**
+   * Session catalog counts
+   */
+  200: SessionCatalogCounts
+}
+
+export type SessionCatalogCountsResponse = SessionCatalogCountsResponses[keyof SessionCatalogCountsResponses]
+
+export type SessionCatalogSessionsData = {
+  body?: never
+  path: {
+    catalogID: string
+  }
+  query: {
+    /**
+     * Project directory for the catalog
+     */
+    directory: string
+    name?: string
+    /**
+     * Unpinned page size
+     */
+    limit?: number
+    cursor?: string
+    /**
+     * Filter sessions by title (case-insensitive)
+     */
+    search?: string
+  }
+  url: "/session/catalog/{catalogID}/sessions"
+}
+
+export type SessionCatalogSessionsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCatalogSessionsError = SessionCatalogSessionsErrors[keyof SessionCatalogSessionsErrors]
+
+export type SessionCatalogSessionsResponses = {
+  /**
+   * Catalog sessions
+   */
+  200: SessionCatalogSessions
+}
+
+export type SessionCatalogSessionsResponse = SessionCatalogSessionsResponses[keyof SessionCatalogSessionsResponses]
 
 export type SessionCatalogDeleteData = {
   body?: never

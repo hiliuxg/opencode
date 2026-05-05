@@ -16,13 +16,13 @@ test("sidebar session links navigate to the selected session", async ({ page, sl
 
     await openSidebar(page)
 
-    const target = page.locator(`[data-session-id="${two.id}"] a`).first()
+    const target = page.locator(`[data-session-id="${two.id}"]`).first()
     await expect(target).toBeVisible()
     await target.click()
 
     await expect(page).toHaveURL(new RegExp(`/${slug}/session/${two.id}(?:\\?|#|$)`))
     await expect(page.locator(promptSelector)).toBeVisible()
-    await expect(page.locator(`[data-session-id="${two.id}"] a`).first()).toHaveClass(/\bactive\b/)
+    await expect(page.locator(`[data-session-id="${two.id}"]`).first()).toHaveClass(/\bbg-surface-base-active\b/)
   } finally {
     await cleanupSession({ sdk, sessionID: one.id })
     await cleanupSession({ sdk, sessionID: two.id })

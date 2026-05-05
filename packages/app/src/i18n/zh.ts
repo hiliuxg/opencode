@@ -618,6 +618,7 @@ export const dict = {
   "conversation.category.analysis": "专项分析",
   "conversation.category.archived": "已经归档",
   "conversation.list.title": "会话列表",
+  "conversation.list.loading": "正在加载会话列表...",
   "conversation.pinned": "置顶",
   "conversation.all": "全部",
   "conversation.empty": "暂无会话",

@@ -21,7 +21,7 @@ import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
 import { Persist, persisted } from "@/utils/persist"
 import { sessionPermissionRequest } from "../session/composer/session-request-tree"
-import { archivedList, catalogs, movable, workspaceKey } from "./helpers"
+import { archivedList, catalogForDirectory, catalogs, movable } from "./helpers"
 
 type Props = {
   project: Accessor<LocalProject | undefined>
@@ -41,8 +41,22 @@ type Props = {
   scrollRef: (el: HTMLDivElement | undefined) => void
 }
 
+type DirPage = {
+  pinned: Session[]
+  items: Session[]
+  count: number
+  cursor?: string
+  more: boolean
+}
+
+type Page = {
+  dirs: Record<string, DirPage | undefined>
+  loading: boolean
+}
+
 const temp = "temp"
 const archived = "archived"
+const size = 10
 
 const icons: Record<NonNullable<SessionCatalog["key"]>, IconProps["name"]> = {
   temp: "prompt",
@@ -64,6 +78,11 @@ function stamp(session: Session) {
 
 function sort(list: Session[]) {
   return list.slice().sort((a, b) => stamp(b) - stamp(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
+function merge(list: Session[], next: Session[]) {
+  const ids = new Set(list.map((item) => item.id))
+  return [...list, ...next.filter((item) => item?.id && !ids.has(item.id))]
 }
 
 function error(err: unknown, fallback: string) {
@@ -110,15 +129,24 @@ export function ConversationSidebar(props: Props) {
 
   const [cats, setCats] = createSignal<SessionCatalog[]>([])
   const [arch, setArch] = createSignal<Session[]>(empty)
+  const [pages, setPages] = createSignal<Record<string, Page>>({})
+  const [totals, setTotals] = createSignal<Record<string, number>>({})
   const rev = { value: 0 }
   const catrev = { value: 0 }
+  const pagerev = { value: 0 }
+  const totalrev = { value: 0 }
 
-  const ids = createMemo(() => new Set(cats().map((cat) => cat.id)))
   const dir = createMemo(() => props.currentDir() || props.dirs()[0] || props.project()?.worktree || "")
-  const active = createMemo(() => cats().find((cat) => cat.id === state.cat) ?? cats()[0])
+  const dircats = createMemo(() => catalogs(cats(), dir()))
+  const ids = createMemo(() => new Set(dircats().map((cat) => cat.id)))
+  const active = createMemo(() => dircats().find((cat) => cat.id === state.cat) ?? dircats()[0])
   const activeID = createMemo(() => active()?.id ?? "")
-  const tempcat = createMemo(() => cats().find((cat) => cat.key === temp) ?? cats()[0])
-  const archcat = createMemo(() => cats().find((cat) => cat.key === archived))
+  const query = createMemo(() => state.query.trim())
+  const key = createMemo(() => `${dir()}\n${activeID()}\n${query()}`)
+  const page = createMemo(() => pages()[key()])
+  const loading = createMemo(() => page()?.loading ?? (!!activeID() && props.dirs().length > 0))
+  const tempcat = createMemo(() => dircats().find((cat) => cat.key === temp) ?? dircats()[0])
+  const archcat = createMemo(() => dircats().find((cat) => cat.key === archived))
   const base = createMemo(() => sort(props.sessions().filter((session) => !session.parentID && !session.time.archived)))
   const system = (cat: SessionCatalog) => cat.key === temp || cat.key === archived
 
@@ -145,7 +173,37 @@ export function ConversationSidebar(props: Props) {
       setState("cat", "")
       return
     }
-    const result = await globalSDK.client.session.catalog.list({ directory }).catch((err) => {
+    const dirs = [...new Set([directory, ...props.dirs()].filter(Boolean))]
+    const rows = await Promise.all(
+      dirs.map((dir) =>
+        globalSDK.client.session.catalog
+          .list({ directory: dir })
+          .then((result) => result.data ?? [])
+          .catch((err) => {
+            showToast({
+              variant: "error",
+              title: language.t("common.requestFailed"),
+              description: error(err, language.t("common.requestFailed")),
+            })
+            return [] as SessionCatalog[]
+          }),
+      ),
+    )
+    if (token !== catrev.value) return
+    const list = catalogs(rows.flat())
+    setCats(list)
+    const current = catalogs(list, directory)
+    if (!current.some((cat) => cat.id === state.cat)) setState("cat", current[0]?.id ?? "")
+  }
+
+  const fetchCounts = async () => {
+    const directory = dir()
+    const token = ++totalrev.value
+    if (!directory) {
+      setTotals({})
+      return
+    }
+    const result = await globalSDK.client.session.catalog.counts({ directory }).catch((err) => {
       showToast({
         variant: "error",
         title: language.t("common.requestFailed"),
@@ -153,10 +211,8 @@ export function ConversationSidebar(props: Props) {
       })
       return
     })
-    if (token !== catrev.value || !result) return
-    const list = catalogs(result.data ?? [])
-    setCats(list)
-    if (!list.some((cat) => cat.id === state.cat)) setState("cat", list[0]?.id ?? "")
+    if (token !== totalrev.value || !result) return
+    setTotals(Object.fromEntries((result.data ?? []).map((item) => [item.catalogID, item.count])))
   }
 
   const fetchArchived = async () => {
@@ -189,15 +245,22 @@ export function ConversationSidebar(props: Props) {
   }
 
   createEffect(() => {
-    const list = cats()
+    const list = dircats()
     if (list.some((cat) => cat.id === state.cat)) return
     setState("cat", list[0]?.id ?? "")
   })
 
   createEffect(
     on(
-      () => dir(),
+      () => `${dir()}\n${props.dirs().join("\n")}`,
       () => void fetchCats(),
+    ),
+  )
+
+  createEffect(
+    on(
+      () => `${dir()}\n${dircats().map((cat) => cat.id).join("\n")}`,
+      () => void fetchCounts(),
     ),
   )
 
@@ -211,42 +274,111 @@ export function ConversationSidebar(props: Props) {
     ),
   )
 
-  const scoped = createMemo(() => {
-    if (active()?.key === archived) return arch()
-    const list = base().filter((session) => catid(session) === activeID())
-    if (list.length > 0) return list
-    return base()
+  const fetchSessions = async (reset = true) => {
+    const cat = active()
+    const dirs = props.dirs()
+    const id = key()
+    const token = ++pagerev.value
+    if (!cat || dirs.length === 0) {
+      setPages((all) => ({ ...all, [id]: { dirs: {}, loading: false } }))
+      return
+    }
+
+    setPages((all) => ({
+      ...all,
+      [id]: { dirs: reset ? {} : (all[id]?.dirs ?? {}), loading: true },
+    }))
+
+    const rows = await Promise.all(
+      dirs.map(async (dir) => {
+        const prev = pages()[id]?.dirs[dir]
+        const next = catalogForDirectory(cats(), cat, dir)
+        if (!next) return { dir, page: prev ?? { pinned: empty, items: empty, count: 0, more: false } }
+        if (!reset && prev && !prev.more) return { dir, page: prev }
+        const result = await globalSDK.client.session.catalog
+          .sessions({
+            directory: dir,
+            catalogID: next.id,
+            limit: size,
+            cursor: reset ? undefined : prev?.cursor,
+            ...(query() && { search: query() }),
+          })
+          .catch((err) => {
+            showToast({
+              variant: "error",
+              title: language.t("toast.session.listFailed.title", { project: dir }),
+              description: error(err, language.t("common.requestFailed")),
+            })
+            return
+          })
+        const data = result?.data
+        if (!data) return { dir, page: prev ?? { pinned: empty, items: empty, count: 0, more: false } }
+        return {
+          dir,
+          page: {
+            pinned: data.pinned ?? empty,
+            items: reset ? (data.items ?? empty) : merge(prev?.items ?? empty, data.items ?? empty),
+            count: data.count ?? 0,
+            cursor: data.nextCursor,
+            more: !!data.nextCursor,
+          },
+        }
+      }),
+    )
+    if (token !== pagerev.value) return
+    setPages((all) => ({
+      ...all,
+      [id]: {
+        dirs: Object.fromEntries(rows.map((row) => [row.dir, row.page])),
+        loading: false,
+      },
+    }))
+  }
+
+  createEffect(
+    on(
+      () =>
+        `${activeID()}\n${props.dirs().join("\n")}\n${cats()
+          .map((cat) => `${cat.directory}:${cat.id}:${cat.key ?? ""}`)
+          .join("\n")}\n${query()}`,
+      () => void fetchSessions(true),
+    ),
+  )
+
+  createEffect(
+    on(
+      () =>
+        props
+          .sessions()
+          .map((session) => `${session.id}:${session.catalogID ?? ""}:${session.time.archived ?? ""}:${session.time.updated}`)
+          .join("\n"),
+      () => {
+        void fetchCounts()
+        void fetchSessions(true)
+      },
+    ),
+  )
+
+  const pinlist = createMemo(() => {
+    const dirs = Object.values(page()?.dirs ?? {})
+    return sort(dirs.flatMap((dir) => dir?.pinned ?? empty))
   })
 
-  const searched = createMemo(() => {
-    const q = state.query.trim().toLowerCase()
-    const list = q ? scoped().filter((session) => session.title.toLowerCase().includes(q)) : scoped()
-    return sort(list)
+  const all = createMemo(() => {
+    const dirs = Object.values(page()?.dirs ?? {})
+    return sort(dirs.flatMap((dir) => dir?.items ?? empty))
   })
 
-  const pinlist = createMemo(() => searched().filter((session) => pinned(session)))
-  const all = createMemo(() => searched().filter((session) => !pinned(session)))
+  const searched = createMemo(() => [...pinlist(), ...all()])
+  const busy = createMemo(() => loading() && searched().length === 0)
 
   const count = (cat: SessionCatalog) => {
-    if (cat.key === archived) return arch().length
-    return base().filter((session) => catid(session) === cat.id).length
+    return totals()[cat.id] ?? 0
   }
 
   const more = createMemo(() => {
-    if (active()?.key === archived || state.query.trim()) return false
-    const limit = props.dirs().reduce((sum, dir) => {
-      const [store] = globalSync.child(dir, { bootstrap: false })
-      return sum + store.limit
-    }, 0)
-    if (scoped().length < limit) return false
-    return props.dirs().some((dir) => {
-      const [store] = globalSync.child(dir, { bootstrap: false })
-      const count = (store.session ?? []).filter(
-        (session) =>
-          workspaceKey(session.directory) === workspaceKey(dir) && !session.parentID && !session.time.archived,
-      ).length
-      return store.sessionTotal > count
-    })
+    if (loading()) return false
+    return Object.values(page()?.dirs ?? {}).some((dir) => !!dir?.more)
   })
 
   const format = (session: Session) => {
@@ -415,7 +547,10 @@ export function ConversationSidebar(props: Props) {
     await globalSDK.client.session
       .update({ directory: session.directory, sessionID: session.id, title: next })
       .then((result) => {
-        if (result.data) updateLocal(session, result.data)
+        if (result.data) {
+          updateLocal(session, result.data)
+          void fetchSessions(true)
+        }
       })
       .catch((err) => {
         showToast({
@@ -462,11 +597,13 @@ export function ConversationSidebar(props: Props) {
     await props.archiveSession(session, { catalogID: id, pinned: false })
     setArch((list) => archivedList(list, session, id))
     if (active()?.key === archived) void fetchArchived()
+    void fetchSessions(true)
   }
 
   const unarchive = async (session: Session) => {
     await updateSession(session, { catalogID: null, time: { archived: null } })
     void globalSync.project.loadSessions(session.directory)
+    void fetchSessions(true)
   }
 
   const remove = async (session: Session) => {
@@ -491,6 +628,7 @@ export function ConversationSidebar(props: Props) {
       }),
     )
     setArch((list) => list.filter((item) => item.id !== session.id))
+    void fetchSessions(true)
     if (params.id === session.id) props.openNew(session.directory)
     return true
   }
@@ -501,13 +639,7 @@ export function ConversationSidebar(props: Props) {
   }
 
   const load = async () => {
-    await Promise.all(
-      props.dirs().map(async (dir) => {
-        const [, setStore] = globalSync.child(dir, { bootstrap: false })
-        setStore("limit", (limit) => (limit ?? 0) + 5)
-        await globalSync.project.loadSessions(dir)
-      }),
-    )
+    await fetchSessions(false)
   }
 
   const Section = (input: {
@@ -640,7 +772,7 @@ export function ConversationSidebar(props: Props) {
                     <>
                       <DropdownMenu.Item
                         onSelect={() => {
-                          void updateSession(session, { pinned: !pinned(session) })
+                          void updateSession(session, { pinned: !pinned(session) }).then(() => fetchSessions(true))
                         }}
                       >
                         <DropdownMenu.ItemLabel>
@@ -700,7 +832,7 @@ export function ConversationSidebar(props: Props) {
                     </span>
                   </button>
                   <DropdownMenu.Separator />
-                  <For each={cats().filter((cat) => cat.key !== archived)}>
+                  <For each={dircats().filter((cat) => cat.key !== archived)}>
                     {(cat) => (
                       <DropdownMenu.Item
                         disabled={catid(session) === cat.id}
@@ -845,7 +977,7 @@ export function ConversationSidebar(props: Props) {
               </div>
               <Show when={section.category}>
                 <div class="flex flex-col gap-1">
-                  <For each={cats()}>
+                  <For each={dircats()}>
                     {(cat) => (
                       <button
                         type="button"
@@ -920,8 +1052,10 @@ export function ConversationSidebar(props: Props) {
             </div>
 
             <Show
-              when={active()?.key !== archived || !state.loading}
-              fallback={<div class="px-1 py-6 text-12-regular text-text-weak">{language.t("prompt.loading")}</div>}
+              when={!busy()}
+              fallback={
+                <div class="px-1 py-6 text-12-regular text-text-weak">{language.t("conversation.list.loading")}</div>
+              }
             >
               <div class="flex flex-col gap-1">
                 <Section
@@ -943,7 +1077,7 @@ export function ConversationSidebar(props: Props) {
                 <Show when={searched().length === 0}>
                   <div class="px-1 py-6 text-12-regular text-text-weak">{language.t("conversation.empty")}</div>
                 </Show>
-                <Show when={more() && active()?.key !== archived}>
+                <Show when={more()}>
                   <Button variant="ghost" size="large" class="w-full justify-center" onClick={() => void load()}>
                     {language.t("common.loadMore")}
                   </Button>

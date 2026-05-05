@@ -50,11 +50,11 @@ bun run build
 
 - **构建原生平台镜像 (推荐):** 
   ```bash
-  docker build -t opencode-admin:latest .
+#  docker build -t opencode-admin-05036355 .
   ```
 - **构建特定平台镜像 (例如针对 CentOS):**
   ```bash
-  docker build --platform linux/amd64 -t opencode-admin:latest .
+  docker build --platform linux/amd64 -t opencode-admin-05036355 .
   ```
 
 ### 3. 镜像导出与导入 (跨机器迁移)
@@ -62,7 +62,7 @@ bun run build
 
 1. **本地机器：导出镜像为 tar 文件**
    ```bash
-   docker save -o opencode-admin.tar opencode-admin:latest 
+   docker save -o  opencode-admin-05036355.tar  opencode-admin-05036355
    ```
 
 2. **将文件上传至服务器并导入**
@@ -70,7 +70,7 @@ bun run build
    # 上传（示例）
    scp opencode-admin.tar root@your-server-ip:/root/
    # 服务器上：载入镜像
-   docker load -i opencode-admin.tar
+   docker load -i opencode-admin-05036355.tar
    ```
 
 ### 4. 使用 Docker 启动 (及环境变量处理)
@@ -80,7 +80,6 @@ bun run build
 **方式一：命令行参数 `-e`**
 ```bash
 docker run -d \
-  --name opencode-admin \
   -p 8787:8787 \
   -e MYSQL_HOST=10.5.140.127 \
   -e MYSQL_USER=root \
@@ -92,7 +91,7 @@ docker run -d \
   -e OPENCODE_DIR=/home/xiaogenliu \
   -e GUIDED_TOPIC_SKILLS=skill-creator \
   -v /data1/opencode_dist/admin/storage:/storage/skills \
-  opencode-admin --basepath opencode
+  opencode-admin-05036355 --basepath opencode
 ```
 
 **方式二：使用 .env 文件**

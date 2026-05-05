@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Session, SessionCatalog } from "@opencode-ai/sdk/v2/client"
-import { archivedList, catalogs, movable } from "./helpers"
+import { archivedList, catalogForDirectory, catalogs, movable } from "./helpers"
 
 const item = (id: string, time: Session["time"], input: Partial<Session> = {}): Session => ({
   id,
@@ -69,5 +69,26 @@ describe("catalogs", () => {
     const list = [cat("archived", "archived"), cat("temp", "temp"), cat("analysis", "analysis")]
 
     expect(catalogs(list).map((cat) => cat.id)).toEqual(["temp", "analysis", "archived"])
+  })
+
+  test("filters catalogs to the active directory", () => {
+    const current = { ...cat("current", "temp"), directory: "/repo/current" }
+    const stale = { ...cat("stale", "temp"), directory: "/repo/stale" }
+
+    expect(catalogs([stale, current], "/repo/current").map((cat) => cat.id)).toEqual(["current"])
+  })
+
+  test("resolves system catalogs by directory before loading sessions", () => {
+    const old = { ...cat("old-temp", "temp"), directory: "/repo/old" }
+    const next = { ...cat("next-temp", "temp"), directory: "/repo/next" }
+
+    expect(catalogForDirectory([old, next], old, "/repo/next")?.id).toBe("next-temp")
+  })
+
+  test("does not reuse custom catalog ids across directories", () => {
+    const old = { ...cat("old-work", undefined), directory: "/repo/old" }
+    const next = { ...cat("next-work", undefined), directory: "/repo/next", name: old.name }
+
+    expect(catalogForDirectory([old, next], old, "/repo/next")).toBeUndefined()
   })
 })

@@ -692,6 +692,7 @@ export const dict = {
   "conversation.category.analysis": "Focused analysis",
   "conversation.category.archived": "Archived",
   "conversation.list.title": "Conversation list",
+  "conversation.list.loading": "Loading conversations...",
   "conversation.pinned": "Pinned",
   "conversation.all": "All",
   "conversation.empty": "No conversations",

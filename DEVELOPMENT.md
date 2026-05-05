@@ -35,7 +35,7 @@ sudo docker load -i opencode-v1313-05036355.tar
   
 # 同容器启动 OpenCode server 和 cc-connect。
 sudo docker run -d \
-  -p 4097:4096 \
+  -p 4096:4096 \
   -e OPENCODE_WEBFETCH_PROXY=http://10.5.135.172:2443 \
   -e OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=20480 \
   -e OPENCODE_ACCESS_GRANTS=/root/.config/opencode/grants.json \
