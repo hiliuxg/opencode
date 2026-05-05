@@ -46,8 +46,19 @@ export const latestRootSession = (stores: SessionStore[], now: number) =>
 
 export const movable = (key: SessionCatalog["key"] | undefined) => key !== "archived"
 
-export const catalogs = (list: SessionCatalog[]) =>
-  list.slice().sort((a, b) => Number(a.key === "archived") - Number(b.key === "archived"))
+export const catalogs = (list: SessionCatalog[], directory?: string) =>
+  (directory ? list.filter((cat) => workspaceKey(cat.directory) === workspaceKey(directory)) : list)
+    .slice()
+    .sort((a, b) => Number(a.key === "archived") - Number(b.key === "archived"))
+
+export function catalogForDirectory(list: SessionCatalog[], active: SessionCatalog, directory: string) {
+  const cats = catalogs(list, directory)
+  if (workspaceKey(active.directory) === workspaceKey(directory)) {
+    return cats.find((cat) => cat.id === active.id)
+  }
+  if (!active.key) return
+  return cats.find((cat) => cat.key === active.key)
+}
 
 const stamp = (session: Session) => session.time.updated ?? session.time.created
 

@@ -124,6 +124,35 @@ export const SessionRoutes = lazy(() =>
         return c.json(catalogs)
       },
     )
+    .get(
+      "/catalog/counts",
+      describeRoute({
+        summary: "Count session catalogs",
+        description: "Get root session counts for each catalog in a project directory.",
+        operationId: "session.catalog.counts",
+        responses: {
+          200: {
+            description: "Session catalog counts",
+            content: {
+              "application/json": {
+                schema: resolver(Session.CatalogCounts),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "query",
+        z.object({
+          directory: z.string().min(1).meta({ description: "Project directory for the catalog" }),
+        }),
+      ),
+      async (c) => {
+        const query = c.req.valid("query")
+        return c.json(await Session.Catalog.counts({ directory: query.directory }))
+      },
+    )
     .post(
       "/catalog",
       describeRoute({
@@ -161,6 +190,65 @@ export const SessionRoutes = lazy(() =>
         const body = c.req.valid("json")
         const catalog = await Session.Catalog.create({ ...body, directory: query.directory })
         return c.json(catalog)
+      },
+    )
+    .get(
+      "/catalog/:catalogID/sessions",
+      describeRoute({
+        summary: "List catalog sessions",
+        description: "Get pinned sessions and a cursor-paginated page of unpinned root sessions for a catalog.",
+        operationId: "session.catalog.sessions",
+        responses: {
+          200: {
+            description: "Catalog sessions",
+            content: {
+              "application/json": {
+                schema: resolver(Session.CatalogSessions),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          catalogID: SessionCatalogID.zod,
+        }),
+      ),
+      validator(
+        "query",
+        z.object({
+          directory: z.string().min(1).meta({ description: "Project directory for the catalog" }),
+          limit: z.coerce.number().int().min(1).max(100).default(10).meta({ description: "Unpinned page size" }),
+          cursor: z
+            .string()
+            .optional()
+            .meta({ description: "Opaque cursor for loading older unpinned sessions" })
+            .refine(
+              (value) => {
+                if (!value) return true
+                const parts = value.split(":")
+                if (parts.length !== 2) return false
+                if (!Number.isFinite(Number(parts[0]))) return false
+                return SessionID.zod.safeParse(parts[1]).success
+              },
+              { message: "Invalid cursor" },
+            ),
+          search: z.string().trim().optional().meta({ description: "Filter sessions by title (case-insensitive)" }),
+        }),
+      ),
+      async (c) => {
+        const query = c.req.valid("query")
+        const catalogID = c.req.valid("param").catalogID
+        const page = await Session.Catalog.sessions({
+          directory: query.directory,
+          catalogID,
+          limit: query.limit,
+          cursor: query.cursor,
+          search: query.search,
+        })
+        return c.json(page)
       },
     )
     .patch(

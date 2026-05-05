@@ -117,12 +117,16 @@ import type {
   QuestionReplyResponses,
   SessionAbortErrors,
   SessionAbortResponses,
+  SessionCatalogCountsErrors,
+  SessionCatalogCountsResponses,
   SessionCatalogCreateErrors,
   SessionCatalogCreateResponses,
   SessionCatalogDeleteErrors,
   SessionCatalogDeleteResponses,
   SessionCatalogListErrors,
   SessionCatalogListResponses,
+  SessionCatalogSessionsErrors,
+  SessionCatalogSessionsResponses,
   SessionCatalogUpdateErrors,
   SessionCatalogUpdateResponses,
   SessionChildrenErrors,
@@ -1404,6 +1408,82 @@ export class Catalog extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * Count session catalogs
+   *
+   * Get root session counts for each catalog in a project directory.
+   */
+  public counts<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory: string
+      name?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "name" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCatalogCountsResponses,
+      SessionCatalogCountsErrors,
+      ThrowOnError
+    >({
+      url: "/session/catalog/counts",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List catalog sessions
+   *
+   * Get pinned sessions and a cursor-paginated page of unpinned root sessions for a catalog.
+   */
+  public sessions<ThrowOnError extends boolean = false>(
+    parameters: {
+      catalogID: string
+      directory: string
+      name?: string
+      limit?: number
+      cursor?: string
+      search?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "catalogID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "name" },
+            { in: "query", key: "limit" },
+            { in: "query", key: "cursor" },
+            { in: "query", key: "search" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCatalogSessionsResponses,
+      SessionCatalogSessionsErrors,
+      ThrowOnError
+    >({
+      url: "/session/catalog/{catalogID}/sessions",
+      ...options,
+      ...params,
     })
   }
 

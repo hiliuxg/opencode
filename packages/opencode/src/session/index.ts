@@ -9,7 +9,22 @@ import { Config } from "../config/config"
 import { Flag } from "../flag/flag"
 import { Installation } from "../installation"
 
-import { Database, NotFoundError, eq, and, gte, isNull, desc, asc, like, inArray, lt } from "../storage/db"
+import {
+  Database,
+  NotFoundError,
+  eq,
+  and,
+  gte,
+  isNull,
+  desc,
+  asc,
+  like,
+  inArray,
+  lt,
+  isNotNull,
+  or,
+  count,
+} from "../storage/db"
 import { SyncEvent } from "../sync"
 import type { SQL } from "../storage/db"
 import { SessionCatalogTable, SessionTable } from "./session.sql"
@@ -212,6 +227,33 @@ export namespace Session {
       ref: "SessionCatalog",
     })
   export type CatalogInfo = z.output<typeof CatalogInfo>
+
+  export const CatalogCount = z
+    .object({
+      catalogID: SessionCatalogID.zod,
+      count: z.number(),
+    })
+    .meta({
+      ref: "SessionCatalogCount",
+    })
+  export type CatalogCount = z.output<typeof CatalogCount>
+
+  export const CatalogCounts = CatalogCount.array().meta({
+    ref: "SessionCatalogCounts",
+  })
+  export type CatalogCounts = z.output<typeof CatalogCounts>
+
+  export const CatalogSessions = z
+    .object({
+      pinned: Info.array(),
+      items: Info.array(),
+      count: z.number(),
+      nextCursor: z.string().optional(),
+    })
+    .meta({
+      ref: "SessionCatalogSessions",
+    })
+  export type CatalogSessions = z.output<typeof CatalogSessions>
 
   export const ProjectInfo = z
     .object({
@@ -932,6 +974,46 @@ export namespace Session {
         }),
     )
 
+    export const counts = fn(z.object({ directory: z.string().min(1) }), (input) =>
+      Database.transaction((db) => {
+        ensure(db, input.directory)
+        return db
+          .select()
+          .from(SessionCatalogTable)
+          .where(
+            and(
+              eq(SessionCatalogTable.project_id, Instance.project.id),
+              eq(SessionCatalogTable.directory, input.directory),
+            ),
+          )
+          .all()
+          .map((cat) => {
+            const base: SQL[] = [
+              eq(SessionTable.project_id, Instance.project.id),
+              eq(SessionTable.directory, input.directory),
+              isNull(SessionTable.parent_id),
+            ]
+
+            if (cat.key === "archived") {
+              base.push(isNotNull(SessionTable.time_archived))
+            }
+
+            if (cat.key !== "archived") {
+              base.push(isNull(SessionTable.time_archived))
+              if (cat.key === "temp") {
+                base.push(isNull(SessionTable.catalog_id))
+              }
+              if (cat.key !== "temp") {
+                base.push(eq(SessionTable.catalog_id, cat.id))
+              }
+            }
+
+            const row = db.select({ count: count() }).from(SessionTable).where(and(...base)).get()
+            return { catalogID: cat.id, count: row?.count ?? 0 }
+          })
+      }),
+    )
+
     export const update = fn(
       z.object({
         catalogID: SessionCatalogID.zod,
@@ -996,6 +1078,92 @@ export namespace Session {
       if (!row) throw new NotFoundError({ message: `Session catalog not found: ${id}` })
       return true
     })
+
+    export const sessions = fn(
+      z.object({
+        directory: z.string().min(1),
+        catalogID: SessionCatalogID.zod,
+        limit: z.number().int().min(1).max(100).default(10),
+        cursor: z.string().optional(),
+        search: z.string().trim().optional(),
+      }),
+      (input) =>
+        Database.transaction((db) => {
+          ensure(db, input.directory)
+          const cat = db
+            .select()
+            .from(SessionCatalogTable)
+            .where(
+              and(
+                eq(SessionCatalogTable.project_id, Instance.project.id),
+                eq(SessionCatalogTable.directory, input.directory),
+                eq(SessionCatalogTable.id, input.catalogID),
+              ),
+            )
+            .get()
+          if (!cat) throw new NotFoundError({ message: `Session catalog not found: ${input.catalogID}` })
+
+          const base: SQL[] = [
+            eq(SessionTable.project_id, Instance.project.id),
+            eq(SessionTable.directory, input.directory),
+            isNull(SessionTable.parent_id),
+          ]
+
+          if (cat.key === "archived") {
+            base.push(isNotNull(SessionTable.time_archived))
+          }
+
+          if (cat.key !== "archived") {
+            base.push(isNull(SessionTable.time_archived))
+            if (cat.key === "temp") {
+              base.push(isNull(SessionTable.catalog_id))
+            }
+            if (cat.key !== "temp") {
+              base.push(eq(SessionTable.catalog_id, cat.id))
+            }
+          }
+
+          if (input.search) {
+            base.push(like(SessionTable.title, `%${input.search}%`))
+          }
+
+          const total = db.select({ count: count() }).from(SessionTable).where(and(...base)).get()
+          const pinned = db
+            .select()
+            .from(SessionTable)
+            .where(and(...base, isNotNull(SessionTable.time_pinned)))
+            .orderBy(desc(SessionTable.time_updated), desc(SessionTable.id))
+            .all()
+            .map(fromRow)
+
+          const parts = input.cursor?.split(":")
+          const time = parts ? Number(parts[0]) : undefined
+          const cur = parts?.[1] as SessionID | undefined
+          const after =
+            time !== undefined && cur
+              ? or(
+                  lt(SessionTable.time_updated, time),
+                  and(eq(SessionTable.time_updated, time), lt(SessionTable.id, cur)),
+                )
+              : undefined
+          const rows = db
+            .select()
+            .from(SessionTable)
+            .where(and(...base, isNull(SessionTable.time_pinned), ...(after ? [after] : [])))
+            .orderBy(desc(SessionTable.time_updated), desc(SessionTable.id))
+            .limit(input.limit + 1)
+            .all()
+          const items = rows.slice(0, input.limit)
+          const last = items.at(-1)
+
+          return {
+            pinned,
+            items: items.map(fromRow),
+            count: total?.count ?? 0,
+            ...(rows.length > input.limit && last && { nextCursor: `${last.time_updated}:${last.id}` }),
+          }
+        }),
+    )
   }
 
   export function* list(input?: {
