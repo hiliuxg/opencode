@@ -59,6 +59,7 @@ import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
 import { DataTable } from "./datatable"
 import { filelink } from "./tool-file-link"
+import { sqlerr, sqlinfo } from "./tool-sql-info"
 
 const SQL_ROWS = 120
 
@@ -368,6 +369,7 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
       return {
         icon: "mcp",
         title: i18n.t("ui.tool.mcp.run_query"),
+        subtitle: sqlinfo(input),
       }
     case "kudata-mcp_get_table_columns":
       return {
@@ -2426,7 +2428,7 @@ function SqlQueryRenderer(props: { data: string }) {
   const total = createMemo(() => rows().length)
   const limited = createMemo(() => rows().slice(0, SQL_ROWS))
 
-  const err = createMemo(() => parsed().message || parsed().data?.result_msg || "Unknown error")
+  const err = createMemo(() => sqlerr(parsed(), props.data))
 
   return (
     <Show
@@ -2437,7 +2439,14 @@ function SqlQueryRenderer(props: { data: string }) {
         </pre>
       }
     >
-      <Show when={parsed().success} fallback={<div data-slot="mcp-sql-error">{err()}</div>}>
+      <Show
+        when={parsed().success}
+        fallback={
+          <pre data-slot="mcp-sql-error" class="m-0 whitespace-pre-wrap break-words">
+            {err()}
+          </pre>
+        }
+      >
       <Show when={cols().length > 0} fallback={<div data-slot="mcp-tool-no-results">No table schema</div>}>
         <DataTable
           head={
@@ -2529,7 +2538,7 @@ ToolRegistry.register({
         icon={info().icon}
         trigger={{
           title: i18n.t("ui.tool.mcp.run_query"),
-          subtitle: `${props.input.engine}-${props.input.cluster}`,
+          subtitle: sqlinfo(props.input ?? {}),
         }}
       >
         <div data-component="mcp-tool-content">

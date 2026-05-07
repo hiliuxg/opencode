@@ -44,6 +44,85 @@ export const sortedRootSessions = (store: SessionStore, now: number) => roots(st
 export const latestRootSession = (stores: SessionStore[], now: number) =>
   stores.flatMap(roots).sort(sortSessions(now))[0]
 
+function entry(session: Session, pin = true) {
+  return [
+    workspaceKey(session.directory),
+    session.id,
+    session.catalogID ?? "",
+    session.time.archived ?? "",
+    pin ? (session.time.pinned ?? "") : "",
+  ].join(":")
+}
+
+function sid(session: Session) {
+  return `${workspaceKey(session.directory)}:${session.id}`
+}
+
+export function remember(seen: Map<string, Set<string>>, list: Session[], pin = true, catalogID?: string) {
+  list.forEach((session) => {
+    const id = sid(session)
+    const set = seen.get(id) ?? new Set<string>()
+    set.add(entry(session, pin))
+    if (catalogID) set.add(entry({ ...session, catalogID }, pin))
+    seen.set(id, set)
+  })
+}
+
+export function fingerprint(list: Session[], pin = true, seen?: Map<string, Set<string>>) {
+  return list
+    .map((session) => {
+      const value = entry(session, pin)
+      if (seen?.get(sid(session))?.has(value)) return
+      return value
+    })
+    .filter((value): value is string => !!value)
+    .sort()
+    .join("\n")
+}
+
+export function synced(dirs: string[], status: (dir: string) => "loading" | "partial" | "complete") {
+  return dirs.length > 0 && dirs.every((dir) => status(dir) === "complete")
+}
+
+export type Gate = {
+  pending: Set<string>
+  done: string
+}
+
+export function gates(): Gate {
+  return {
+    pending: new Set(),
+    done: "",
+  }
+}
+
+export function gate(state: Gate, key: string) {
+  if (state.pending.has(key) || state.done === key) return false
+  state.pending.add(key)
+  return true
+}
+
+export function done(state: Gate, key: string, ok: boolean) {
+  state.pending.delete(key)
+  if (ok) state.done = key
+}
+
+export function reset(state: Gate) {
+  state.pending.clear()
+  state.done = ""
+}
+
+export function changed(state: { value?: string }, key: string, ready: boolean) {
+  if (!ready) return false
+  if (state.value === undefined) {
+    state.value = key
+    return false
+  }
+  if (state.value === key) return false
+  state.value = key
+  return true
+}
+
 export const movable = (key: SessionCatalog["key"] | undefined) => key !== "archived"
 
 export const catalogs = (list: SessionCatalog[], directory?: string) =>

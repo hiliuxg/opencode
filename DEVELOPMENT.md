@@ -10,13 +10,11 @@
 # opencode-v1313-04202355
 # 84da2a3a23bd   opencode-v1313-04242355
 
-# 前端构建
+# 前端构建 # 后端构建
 
 export OPENCODE_BASE_PATH=/kgbi/starbot
 
 bun run --cwd packages/app build
-
-# 后端构建
 
 export OPENCODE_BASE_PATH=/kgbi/starbot
 export OPENCODE_SKILL_MARKET_TOKEN=4LXfT11bcFQaU5T27Zgw40G7jYB
@@ -31,7 +29,6 @@ docker buildx build --platform linux/amd64 \
 docker save -o opencode-v1313-05036355.tar opencode-v1313-05036355
 
 sudo docker load -i opencode-v1313-05036355.tar
-  
   
 # 同容器启动 OpenCode server 和 cc-connect。
 sudo docker run -d \

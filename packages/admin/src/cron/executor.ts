@@ -28,7 +28,7 @@ export class Executor {
     private queue: string[] = []
 
     constructor(opts?: { concurrency?: number }) {
-        this.concurrency = opts?.concurrency ?? 5
+        this.concurrency = opts?.concurrency ?? 30
     }
 
     /** Enqueue a job for execution */
@@ -119,7 +119,7 @@ export class Executor {
         try {
             const result = await withRetry(
                 () => this.callOpencode(user, job, config),
-                { maxRetries: job.maxRetries ?? 3, label: `job:${jobId}` }
+                { maxRetries: 0, label: `job:${jobId}` }
             )
 
             const duration = Date.now() - startTime
@@ -184,7 +184,7 @@ export class Executor {
             method: "POST",
             headers,
             body: JSON.stringify({}),
-            signal: AbortSignal.timeout((job.timeout_seconds ?? 300) * 1000),
+            signal: AbortSignal.timeout(60 * 60 * 1000),
         })
 
         if (!createRes.ok) {
@@ -224,7 +224,7 @@ export class Executor {
             method: "POST",
             headers,
             body: JSON.stringify(promptBody),
-            signal: AbortSignal.timeout((job.timeout_seconds ?? 300) * 1000),
+            signal: AbortSignal.timeout(60 * 60 * 1000),
         })
 
         if (!promptRes.ok) {
