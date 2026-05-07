@@ -31,6 +31,7 @@ import { useSettings } from "@/context/settings"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
+import { createMediaQuery } from "@solid-primitives/media"
 import { useProviders } from "@/hooks/use-providers"
 import { showToast, Toast, toaster } from "@opencode-ai/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
@@ -134,6 +135,7 @@ export default function Layout(props: ParentProps) {
   const theme = useTheme()
   const language = useLanguage()
   const initialDirectory = decode64(params.dir)
+  const desktop = createMediaQuery("(min-width: 1280px)")
   const route = createMemo(() => {
     const slug = params.dir
     if (!slug) return { slug, dir: "" }
@@ -2544,7 +2546,9 @@ export default function Layout(props: ParentProps) {
                 arm()
               }}
             >
-              <div class="@container w-full h-full contain-strict">{sidebarContent()}</div>
+              <Show when={desktop()}>
+                <div class="@container w-full h-full contain-strict">{sidebarContent()}</div>
+              </Show>
             </nav>
 
             <Show when={layout.sidebar.opened()}>
@@ -2594,7 +2598,7 @@ export default function Layout(props: ParentProps) {
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {sidebarContent(true)}
+                <Show when={!desktop() && layout.mobileSidebar.opened()}>{sidebarContent(true)}</Show>
               </nav>
             </div>
 
@@ -2640,7 +2644,7 @@ export default function Layout(props: ParentProps) {
                 arm()
               }}
             >
-              <Show when={peekProject()}>
+              <Show when={desktop() && peekProject()}>
                 <ConversationSidebar
                   project={peekProject}
                   sessions={peekSessions}

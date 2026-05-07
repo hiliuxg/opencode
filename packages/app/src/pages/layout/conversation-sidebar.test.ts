@@ -1,6 +1,19 @@
 import { describe, expect, test } from "bun:test"
 import type { Session, SessionCatalog } from "@opencode-ai/sdk/v2/client"
-import { archivedList, catalogForDirectory, catalogs, movable } from "./helpers"
+import {
+  archivedList,
+  catalogForDirectory,
+  catalogs,
+  changed,
+  done,
+  fingerprint,
+  gate,
+  gates,
+  movable,
+  remember,
+  reset,
+  synced,
+} from "./helpers"
 
 const item = (id: string, time: Session["time"], input: Partial<Session> = {}): Session => ({
   id,
@@ -90,5 +103,133 @@ describe("catalogs", () => {
     const next = { ...cat("next-work", undefined), directory: "/repo/next", name: old.name }
 
     expect(catalogForDirectory([old, next], old, "/repo/next")).toBeUndefined()
+  })
+})
+
+describe("fingerprint", () => {
+  test("ignores ordinary session metadata changes", () => {
+    const before = fingerprint([item("one", { created: 1, updated: 2 })])
+    const after = fingerprint([item("one", { created: 1, updated: 3 }, { title: "renamed" })])
+
+    expect(after).toBe(before)
+  })
+
+  test("tracks changes that affect catalog session pages", () => {
+    const base = item("one", { created: 1, updated: 2 })
+    const key = fingerprint([base])
+
+    expect(fingerprint([{ ...base, catalogID: "analysis" }])).not.toBe(key)
+    expect(fingerprint([{ ...base, time: { ...base.time, archived: 3 } }])).not.toBe(key)
+    expect(fingerprint([{ ...base, time: { ...base.time, pinned: 4 } }])).not.toBe(key)
+    expect(fingerprint([base, item("two", { created: 2, updated: 2 })])).not.toBe(key)
+  })
+
+  test("can ignore pinned changes for count refreshes", () => {
+    const base = item("one", { created: 1, updated: 2 })
+    const next = item("one", { created: 1, updated: 2, pinned: 3 })
+
+    expect(fingerprint([next], false)).toBe(fingerprint([base], false))
+  })
+
+  test("ignores sessions already loaded from catalog pages", () => {
+    const base = item("one", { created: 1, updated: 2 })
+    const seen = new Map<string, Set<string>>()
+
+    remember(seen, [base])
+
+    expect(fingerprint([base], true, seen)).toBe("")
+    expect(fingerprint([{ ...base, time: { ...base.time, pinned: 3 } }], true, seen)).not.toBe("")
+  })
+
+  test("can ignore pinned changes for known count signatures", () => {
+    const base = item("one", { created: 1, updated: 2 })
+    const next = item("one", { created: 1, updated: 2, pinned: 3 })
+    const seen = new Map<string, Set<string>>()
+
+    remember(seen, [base], false)
+
+    expect(fingerprint([next], false, seen)).toBe("")
+  })
+
+  test("can remember catalog endpoint rows with their path catalog id", () => {
+    const base = item("one", { created: 1, updated: 2 })
+    const seen = new Map<string, Set<string>>()
+
+    remember(seen, [base], true, "temp")
+
+    expect(fingerprint([{ ...base, catalogID: "temp" }], true, seen)).toBe("")
+    expect(fingerprint([base], true, seen)).toBe("")
+  })
+})
+
+describe("synced", () => {
+  test("waits for visible directories to finish initial sync", () => {
+    expect(synced([], () => "complete")).toBe(false)
+    expect(synced(["/repo"], () => "loading")).toBe(false)
+    expect(synced(["/repo"], () => "partial")).toBe(false)
+    expect(synced(["/repo"], () => "complete")).toBe(true)
+  })
+
+  test("requires every visible directory to be complete", () => {
+    expect(synced(["/repo", "/repo/other"], (dir) => (dir === "/repo" ? "complete" : "partial"))).toBe(false)
+    expect(synced(["/repo", "/repo/other"], () => "complete")).toBe(true)
+  })
+})
+
+describe("gate", () => {
+  test("skips duplicate pending and completed keys", () => {
+    const state = gates()
+
+    expect(gate(state, "one")).toBe(true)
+    expect(gate(state, "one")).toBe(false)
+
+    done(state, "one", true)
+
+    expect(gate(state, "one")).toBe(false)
+    expect(gate(state, "two")).toBe(true)
+  })
+
+  test("allows retry after failed request", () => {
+    const state = gates()
+
+    expect(gate(state, "one")).toBe(true)
+    done(state, "one", false)
+
+    expect(gate(state, "one")).toBe(true)
+  })
+
+  test("allows an older completed key after a newer key finishes", () => {
+    const state = gates()
+
+    expect(gate(state, "one")).toBe(true)
+    done(state, "one", true)
+    expect(gate(state, "two")).toBe(true)
+    done(state, "two", true)
+
+    expect(gate(state, "one")).toBe(true)
+  })
+
+  test("can be reset after a structural cache invalidation", () => {
+    const state = gates()
+
+    expect(gate(state, "one")).toBe(true)
+    done(state, "one", true)
+    reset(state)
+
+    expect(gate(state, "one")).toBe(true)
+  })
+})
+
+describe("changed", () => {
+  test("arms on first ready signature before reporting structural changes", () => {
+    const state: { value?: string } = {}
+
+    expect(changed(state, "initial", false)).toBe(false)
+    expect(state.value).toBeUndefined()
+
+    expect(changed(state, "initial", true)).toBe(false)
+    expect(changed(state, "initial", true)).toBe(false)
+    expect(changed(state, "next", true)).toBe(true)
+    expect(changed(state, "next", true)).toBe(false)
   })
 })
